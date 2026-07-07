@@ -25,13 +25,35 @@ html {
 body {
   margin: 0;
   color: var(--ink);
-  background:
-    linear-gradient(rgba(34, 18, 8, 0.08), rgba(34, 18, 8, 0.08)),
-    url("images/food-board-background.png") center top / cover fixed;
+  background: #261409;
   padding: clamp(28px, 5vw, 82px) 0;
 }
 
+body::before,
+body::after {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+}
+
+body::before {
+  z-index: -2;
+  background: url("images/food-board-background.png") center top / cover no-repeat;
+  filter: blur(8px);
+  transform: scale(1.035);
+}
+
+body::after {
+  z-index: -1;
+  background:
+    radial-gradient(circle at center, rgba(255, 245, 230, 0.12), transparent 46%),
+    rgba(27, 13, 4, 0.46);
+}
+
 .site-inlay {
+  position: relative;
+  z-index: 1;
   width: min(1220px, calc(100vw - 72px));
   margin: 0 auto;
   border: 1px solid rgba(255, 255, 255, 0.72);
@@ -1041,6 +1063,11 @@ main {
   body {
     padding: 0;
     background: #fff;
+  }
+
+  body::before,
+  body::after {
+    display: none;
   }
 
   .site-inlay {
