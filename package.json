@@ -1,7 +1,9 @@
 {
-  "name": "project",
+  "name": "bitsbytescafe",
   "version": "1.0.0",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "build": "echo 'Static site - no build step required'"
+    "build": "node scripts/build.mjs"
   }
 }
