@@ -25,7 +25,23 @@ html {
 body {
   margin: 0;
   color: var(--ink);
-  background: var(--paper);
+  background:
+    linear-gradient(rgba(34, 18, 8, 0.08), rgba(34, 18, 8, 0.08)),
+    url("images/food-board-background.png") center top / cover fixed;
+  padding: clamp(28px, 5vw, 82px) 0;
+}
+
+.site-inlay {
+  width: min(1220px, calc(100vw - 72px));
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 28px;
+  background: #fff;
+  box-shadow:
+    0 70px 130px rgba(14, 7, 2, 0.58),
+    0 24px 52px rgba(24, 12, 4, 0.34),
+    0 4px 14px rgba(24, 12, 4, 0.22);
 }
 
 img {
@@ -37,19 +53,21 @@ a {
   color: inherit;
 }
 
+main {
+  padding-top: 34px;
+}
+
 .site-header {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 30;
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: 28px;
   min-height: 88px;
-  padding: 14px max(28px, calc((100vw - var(--container)) / 2));
+  padding: 14px 70px;
   border-bottom: 1px solid rgba(17, 19, 24, 0.08);
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(14px);
+  background: #fff;
 }
 
 .brand {
@@ -111,10 +129,15 @@ a {
 .hero {
   position: relative;
   overflow: hidden;
+  max-width: var(--container);
   min-height: 455px;
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 24px;
   background:
     radial-gradient(circle at 0% 60%, rgba(243, 108, 19, 0.08), transparent 26%),
     linear-gradient(90deg, #fff8ec 0%, #fff 39%, #fff 100%);
+  box-shadow: 0 18px 40px rgba(82, 52, 20, 0.14);
 }
 
 .hero::after {
@@ -138,14 +161,14 @@ a {
   min-height: 455px;
   max-width: var(--container);
   margin: 0 auto;
-  padding: 48px 0 70px;
+  padding: 48px 64px 70px;
 }
 
 .hero-copy {
   position: relative;
   z-index: 4;
   align-self: center;
-  padding-left: 6px;
+  padding-left: 0;
 }
 
 .location-pill {
@@ -269,16 +292,16 @@ a {
 
 .hero-media {
   position: absolute;
-  inset: 0 calc((100vw - var(--container)) / -2) 0 34%;
+  inset: 0 0 0 34%;
   z-index: 2;
   pointer-events: none;
 }
 
 .hero-reference-image {
   position: absolute;
-  right: -4%;
+  right: -9%;
   top: -6px;
-  width: clamp(860px, 68vw, 1180px);
+  width: clamp(760px, 67vw, 980px);
   height: 106%;
   max-width: none;
   object-fit: cover;
@@ -842,7 +865,16 @@ a {
 
 @media (max-width: 1180px) {
   :root {
-    --container: calc(100vw - 48px);
+    --container: calc(100vw - 96px);
+  }
+
+  body {
+    padding: 24px 0;
+  }
+
+  .site-inlay {
+    width: calc(100vw - 32px);
+    border-radius: 24px;
   }
 
   .site-header {
@@ -871,7 +903,7 @@ a {
 
   .hero-inner {
     grid-template-columns: 1fr;
-    padding: 40px 0 24px;
+    padding: 40px 34px 24px;
   }
 
   .hero-copy {
@@ -941,6 +973,22 @@ a {
     --container: calc(100vw - 32px);
   }
 
+  body {
+    padding: 0;
+    background: #fff;
+  }
+
+  .site-inlay {
+    width: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  main {
+    padding-top: 0;
+  }
+
   .site-header {
     min-height: 78px;
     padding: 12px 16px;
@@ -957,6 +1005,13 @@ a {
 
   .hero {
     min-height: 0;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+  }
+
+  .hero-inner {
+    padding: 36px 22px 24px;
   }
 
   .hero h1 {
