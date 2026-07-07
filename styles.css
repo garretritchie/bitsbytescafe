@@ -59,13 +59,6 @@ a {
   text-decoration: none;
 }
 
-.brand-logo-compact {
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
 .brand-logo-wide {
   width: clamp(178px, 18vw, 230px);
   height: 54px;
@@ -955,11 +948,6 @@ a {
 
   .brand-logo-wide {
     width: 178px;
-  }
-
-  .brand-logo-compact {
-    width: 48px;
-    height: 48px;
   }
 
   .nav-links {
