@@ -820,7 +820,17 @@ a {
   border-radius: 50%;
   color: #fff;
   background: #2f7be8;
+  font-size: 0.72rem;
   font-weight: 900;
+  text-transform: uppercase;
+}
+
+.footer-social[href*="instagram"] span {
+  background: #e84d76;
+}
+
+.footer-social[href*="tiktok"] span {
+  background: #111;
 }
 
 .copyright,
