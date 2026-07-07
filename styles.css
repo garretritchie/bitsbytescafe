@@ -283,9 +283,9 @@ a {
 
 .hero-reference-image {
   position: absolute;
-  right: -8%;
+  right: -4%;
   top: -6px;
-  width: min(900px, 74vw);
+  width: clamp(860px, 68vw, 1180px);
   height: 106%;
   max-width: none;
   object-fit: cover;
