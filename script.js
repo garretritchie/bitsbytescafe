@@ -1,6 +1,23 @@
 const lightbox = document.querySelector(".lightbox");
 const lightboxImage = document.querySelector(".lightbox img");
 const lightboxClose = document.querySelector(".lightbox-close");
+const menuFilterButtons = document.querySelectorAll("[data-menu-filter]");
+const plateCards = document.querySelectorAll("[data-menu-category]");
+
+menuFilterButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const filter = button.getAttribute("data-menu-filter");
+
+    menuFilterButtons.forEach((item) => {
+      item.classList.toggle("is-active", item === button);
+    });
+
+    plateCards.forEach((card) => {
+      const category = card.getAttribute("data-menu-category");
+      card.hidden = filter !== "all" && category !== filter;
+    });
+  });
+});
 
 document.querySelectorAll("[data-photo]").forEach((button) => {
   button.addEventListener("click", () => {

@@ -32,6 +32,9 @@
     <main id="top" class="page-shell">
       <div class="main-column">
         <section class="hero" aria-labelledby="hero-title">
+          <span class="leaf leaf-hero-one" aria-hidden="true"></span>
+          <span class="leaf leaf-hero-two" aria-hidden="true"></span>
+          <span class="leaf leaf-hero-three" aria-hidden="true"></span>
           <div class="hero-copy">
             <h1 id="hero-title">Fresh bites.<br><span>Friendly bytes.</span></h1>
             <p>Breakfast, lunch, coffee, and comfort food served with local flavor.</p>
@@ -45,7 +48,7 @@
             <img class="hero-image hero-image-small" src="images/472506776_2088932468245608_6971659058457923975_n.jpg" alt="Fried chicken and fries from Bits and Bytes Cafe">
             <div class="hero-card hero-card-menu">
               <strong>Daily Lunch Specials</strong>
-              <span>Ask what is fresh today.</span>
+              <span>Fresh, filling, affordable.</span>
             </div>
             <div class="hero-card hero-card-contact">
               <strong>Call or WhatsApp</strong>
@@ -56,64 +59,101 @@
 
         <section id="menu" class="menu-section" aria-labelledby="menu-title">
           <div class="section-heading">
-            <h2 id="menu-title">Menu</h2>
+            <div>
+              <h2 id="menu-title">Popular Plates</h2>
+              <p>Fresh cafe favorites, priced for everyday cravings.</p>
+            </div>
             <a href="images/menu.jpg" target="_blank" rel="noopener">Open full menu</a>
           </div>
-          <div class="menu-board" aria-label="Bits and Bytes Cafe menu">
-            <article>
-              <h3>Breakfast <small>served with grits or rice</small></h3>
-              <p><span>Scrambled Eggs</span><strong>$6.50</strong></p>
-              <p><span>Tuna Salad</span><strong>$6.50</strong></p>
-              <p><span>Steamed Sausage</span><strong>$6.50</strong></p>
-              <p><span>Breakfast Combo <em>eggs, sausage, or tuna</em></span><strong>$9.00</strong></p>
-              <p><span>Veggie Saute <em>mushroom, peppers, onions</em></span><strong>$9.00</strong></p>
-              <p><span>Egg Omelet <em>veggies &amp; cheese, add ham $2.50</em></span><strong>$9.00</strong></p>
+          <div class="menu-filter" aria-label="Menu categories">
+            <button class="is-active" type="button" data-menu-filter="all">All</button>
+            <button type="button" data-menu-filter="breakfast">Breakfast</button>
+            <button type="button" data-menu-filter="wings">Wings</button>
+            <button type="button" data-menu-filter="burgers">Burgers &amp; Wraps</button>
+            <button type="button" data-menu-filter="sides">Sides</button>
+          </div>
+          <div class="popular-grid" aria-label="Popular Bits and Bytes Cafe menu items">
+            <article class="plate-card" data-menu-category="breakfast">
+              <img src="images/472556980_2088946614910860_8525602129205215159_n.jpg" alt="Breakfast with eggs and grits">
+              <div>
+                <span>Breakfast</span>
+                <h3>Breakfast Combo</h3>
+                <p>Eggs, sausage, or tuna with grits or rice.</p>
+              </div>
+              <strong>$9.00</strong>
             </article>
-            <article>
-              <h3>Breakfast Sandwiches</h3>
-              <p><span>Butter Croissant</span><strong>$3.50</strong></p>
-              <p><span>Tuna Croissant</span><strong>$6.50</strong></p>
-              <p><span>Egg &amp; Cheese Croissant</span><strong>$6.50</strong></p>
-              <p><span>Ham or Turkey &amp; Cheese Croissant</span><strong>$6.50</strong></p>
-              <p><span>Ham or Turkey, Egg &amp; Cheese Croissant</span><strong>$8.50</strong></p>
-              <p><span>Bacon, Egg &amp; Cheese Croissant</span><strong>$9.00</strong></p>
+            <article class="plate-card" data-menu-category="breakfast">
+              <img src="images/74701671_789937314811803_7285541664016302080_n.jpg" alt="Cafe breakfast plate">
+              <div>
+                <span>Breakfast</span>
+                <h3>Egg Omelet</h3>
+                <p>Veggies and cheese. Add ham for $2.50.</p>
+              </div>
+              <strong>$9.00</strong>
             </article>
-            <article class="wings-card">
-              <h3>Wings</h3>
-              <div class="wing-header" aria-hidden="true"><span></span><b>4pc</b><b>6pc</b><b>8pc</b></div>
-              <p><span>Plain Wings</span><strong>$5.00</strong><strong>$7.00</strong><strong>$9.00</strong></p>
-              <p><span>Sweet Chili Wings</span><strong>$5.50</strong><strong>$7.50</strong><strong>$9.50</strong></p>
-              <p><span>Honey BBQ Wings</span><strong>$5.50</strong><strong>$7.50</strong><strong>$9.50</strong></p>
-              <p><span>Spicy Cajun Wings</span><strong>$5.50</strong><strong>$7.50</strong><strong>$9.50</strong></p>
+            <article class="plate-card" data-menu-category="wings">
+              <img src="images/472792658_2088947638244091_7608298803866236422_n.jpg" alt="Chicken wings and fries">
+              <div>
+                <span>Wings</span>
+                <h3>Honey BBQ Wings</h3>
+                <p>4pc, 6pc, or 8pc servings.</p>
+              </div>
+              <strong>from $5.50</strong>
             </article>
-            <article>
-              <h3>Subs, Burgers, Wraps</h3>
-              <p><span>Tuna Salad <em>sub or wrap</em></span><strong>$7.50</strong></p>
-              <p><span>Ham or Turkey &amp; Cheese <em>sub or wrap</em></span><strong>$7.50</strong></p>
-              <p><span>Veggie Burger <em>add cheese $1.00</em></span><strong>$8.50</strong></p>
-              <p><span>Cheese Burger <em>add 2 strips bacon $2.50</em></span><strong>$8.50</strong></p>
-              <p><span>Cajun Chicken <em>sub, burger or wrap</em></span><strong>$9.50</strong></p>
-              <p><span>Club Sandwich <em>sub or wrap</em></span><strong>$12.50</strong></p>
-              <p><span>Salmon &amp; Swiss <em>sub, burger or wrap</em></span><strong>$16.50</strong></p>
+            <article class="plate-card" data-menu-category="wings">
+              <img src="images/472506776_2088932468245608_6971659058457923975_n.jpg" alt="Fried chicken and fries">
+              <div>
+                <span>Wings</span>
+                <h3>Sweet Chili Wings</h3>
+                <p>Fresh, saucy, and served hot.</p>
+              </div>
+              <strong>from $5.50</strong>
             </article>
-            <article class="sides-card">
-              <h3>Sides &amp; Salads</h3>
-              <p><span>French Fries</span><strong>$3.00</strong></p>
-              <p><span>Baked Macaroni</span><strong>$3.50</strong></p>
-              <p><span>White Rice</span><strong>$3.00</strong></p>
-              <p><span>Cajun Rice</span><strong>$3.50</strong></p>
-              <p><span>Side Salad</span><strong>$5.00</strong></p>
-              <p><span>Garden Salad</span><strong>$7.50</strong></p>
-              <p><span>Sweet Corn</span><strong>$1.50</strong></p>
-              <p><span>Beets</span><strong>$1.50</strong></p>
+            <article class="plate-card" data-menu-category="burgers">
+              <img src="images/472498833_2088951538243701_2001074753781445521_n.jpg" alt="Burger and fries">
+              <div>
+                <span>Burgers</span>
+                <h3>Cheese Burger</h3>
+                <p>Add two strips of bacon for $2.50.</p>
+              </div>
+              <strong>$8.50</strong>
+            </article>
+            <article class="plate-card" data-menu-category="burgers">
+              <img src="images/473063879_2089541328184722_6360470533825390874_n.jpg" alt="Cafe wrap and salad">
+              <div>
+                <span>Wraps</span>
+                <h3>Cajun Chicken</h3>
+                <p>Available as a sub, burger, or wrap.</p>
+              </div>
+              <strong>$9.50</strong>
+            </article>
+            <article class="plate-card" data-menu-category="sides">
+              <img src="images/469305617_2066178263854362_836800688872244264_n.jpg" alt="Salmon and rice plate">
+              <div>
+                <span>Sides</span>
+                <h3>Baked Macaroni</h3>
+                <p>Comfort-food side for lunch plates.</p>
+              </div>
+              <strong>$3.50</strong>
+            </article>
+            <article class="plate-card" data-menu-category="sides">
+              <img src="images/72715211_778108052661396_8062257654497542144_n.jpg" alt="Chicken salad plate">
+              <div>
+                <span>Salads</span>
+                <h3>Garden Salad</h3>
+                <p>Fresh side or light meal option.</p>
+              </div>
+              <strong>$7.50</strong>
             </article>
           </div>
-          <p class="menu-special">Ask about our daily lunch specials.</p>
         </section>
 
         <section id="gallery" class="gallery-section" aria-labelledby="gallery-title">
           <div class="section-heading">
-            <h2 id="gallery-title">Fresh From the Cafe</h2>
+            <div>
+              <h2 id="gallery-title">Fresh From the Cafe</h2>
+              <p>Real plates, real flavor, straight from the kitchen.</p>
+            </div>
             <a href="https://www.facebook.com/bitsbytescafe/photos" target="_blank" rel="noopener">See all photos</a>
           </div>
           <div class="gallery-grid" aria-label="Bits and Bytes Cafe photo gallery">
@@ -129,16 +169,17 @@
             <button type="button" data-photo="images/74701671_789937314811803_7285541664016302080_n.jpg">
               <img src="images/74701671_789937314811803_7285541664016302080_n.jpg" alt="Cafe breakfast plate">
             </button>
-            <button type="button" data-photo="images/308120932_497819889020631_3142400193580030339_n.jpg">
-              <img src="images/308120932_497819889020631_3142400193580030339_n.jpg" alt="Bits and Bytes Cafe dish">
+            <button type="button" data-photo="images/469305617_2066178263854362_836800688872244264_n.jpg">
+              <img src="images/469305617_2066178263854362_836800688872244264_n.jpg" alt="Salmon and rice plate">
             </button>
-            <button type="button" data-photo="images/161655058_1163938114078386_8972075710403647784_n.jpg">
-              <img src="images/161655058_1163938114078386_8972075710403647784_n.jpg" alt="Cafe food close up">
+            <button type="button" data-photo="images/472745392_2088930574912464_4825028608755080364_n.jpg">
+              <img src="images/472745392_2088930574912464_4825028608755080364_n.jpg" alt="Fresh omelet plate">
             </button>
           </div>
         </section>
 
         <footer id="visit" class="site-footer" aria-labelledby="visit-title">
+          <span class="leaf leaf-footer" aria-hidden="true"></span>
           <div>
             <h2 id="visit-title">Visit Bits and Bytes Cafe</h2>
             <p>Ask about our daily lunch specials, breakfast favorites, wings, burgers, wraps, sides, salads, and coffee.</p>
