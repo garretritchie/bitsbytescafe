@@ -124,15 +124,18 @@ a {
 .hero {
   position: relative;
   overflow: hidden;
-  display: grid;
-  grid-template-columns: minmax(360px, 0.9fr) minmax(430px, 1.1fr);
-  gap: 18px;
-  align-items: center;
+  display: block;
   min-height: 306px;
   padding: 34px clamp(22px, 4vw, 54px) 26px;
   background:
     radial-gradient(circle at 76% 30%, rgba(244, 119, 33, 0.05), transparent 28%),
     linear-gradient(112deg, #ffffff 0%, #ffffff 54%, #fffaf1 100%);
+}
+
+.hero-copy {
+  position: relative;
+  z-index: 3;
+  width: min(43%, 430px);
 }
 
 .hero h1 {
@@ -197,34 +200,43 @@ a {
 }
 
 .hero-media {
-  position: relative;
-  align-self: stretch;
-  min-height: 305px;
-  overflow: visible;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .hero-media::after {
   position: absolute;
-  right: 7%;
-  bottom: 7px;
-  width: 76%;
-  height: 40px;
+  right: 4%;
+  bottom: 26px;
+  width: 62%;
+  height: 46px;
   border-radius: 50%;
   background: rgba(87, 55, 22, 0.14);
   content: "";
-  filter: blur(14px);
+  filter: blur(18px);
 }
 
 .hero-reference-image {
   position: absolute;
-  right: -4px;
-  bottom: 46px;
+  right: -2%;
+  top: 0;
   z-index: 2;
-  width: min(520px, 106%);
+  width: 72%;
+  height: 100%;
   max-width: none;
+  object-fit: cover;
+  object-position: center right;
   filter: drop-shadow(0 22px 34px rgba(87, 55, 22, 0.1));
-  -webkit-mask-image: radial-gradient(ellipse at 58% 54%, #000 0 69%, rgba(0, 0, 0, 0.92) 78%, transparent 100%);
-  mask-image: radial-gradient(ellipse at 58% 54%, #000 0 69%, rgba(0, 0, 0, 0.92) 78%, transparent 100%);
+  -webkit-mask-image:
+    linear-gradient(90deg, transparent 0%, transparent 21%, rgba(0, 0, 0, 0.62) 34%, #000 47%, #000 88%, transparent 100%),
+    linear-gradient(180deg, transparent 0%, #000 10%, #000 86%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(90deg, transparent 0%, transparent 21%, rgba(0, 0, 0, 0.62) 34%, #000 47%, #000 88%, transparent 100%),
+    linear-gradient(180deg, transparent 0%, #000 10%, #000 86%, transparent 100%);
+  mask-composite: intersect;
 }
 
 .hero-image {
@@ -876,8 +888,11 @@ a {
   }
 
   .hero {
-    grid-template-columns: 1fr;
     padding-top: 48px;
+  }
+
+  .hero-copy {
+    width: min(58%, 520px);
   }
 
   .hero h1 {
@@ -885,13 +900,14 @@ a {
   }
 
   .hero-media {
-    min-height: 330px;
+    min-height: 0;
   }
 
   .hero-reference-image {
-    right: 0;
-    bottom: 34px;
-    width: min(560px, 100%);
+    right: -8%;
+    top: 4%;
+    width: 82%;
+    height: 94%;
   }
 
   .hero-image-large {
@@ -960,15 +976,28 @@ a {
     font-size: clamp(2.85rem, 13vw, 4.1rem);
   }
 
+  .hero-copy {
+    width: 100%;
+  }
+
   .hero-media {
+    position: relative;
     display: block;
-    min-height: 250px;
+    min-height: 230px;
+    margin-top: 20px;
   }
 
   .hero-reference-image {
     right: -18px;
-    bottom: 18px;
+    top: 0;
     width: min(430px, 116%);
+    height: 100%;
+    -webkit-mask-image:
+      linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.4) 10%, #000 28%, #000 88%, transparent 100%),
+      linear-gradient(180deg, transparent 0%, #000 9%, #000 88%, transparent 100%);
+    mask-image:
+      linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.4) 10%, #000 28%, #000 88%, transparent 100%),
+      linear-gradient(180deg, transparent 0%, #000 9%, #000 88%, transparent 100%);
   }
 
   .hero-image {
