@@ -61,7 +61,7 @@ main {
   position: relative;
   z-index: 30;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 28px;
   min-height: 88px;
@@ -94,6 +94,30 @@ main {
 .nav-links a {
   position: relative;
   text-decoration: none;
+}
+
+.header-phone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 2px solid rgba(243, 108, 19, 0.22);
+  border-radius: 999px;
+  color: var(--orange);
+  background: #fff8ef;
+  font-size: clamp(1rem, 1.3vw, 1.32rem);
+  font-weight: 900;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.header-phone:hover,
+.header-phone:focus-visible {
+  border-color: var(--orange);
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(171, 80, 10, 0.16);
 }
 
 .nav-links a:hover::after,
@@ -893,6 +917,11 @@ main {
 }
 
 @media (max-width: 900px) {
+  .site-header {
+    grid-template-columns: auto auto;
+    justify-content: space-between;
+  }
+
   .nav-links {
     grid-column: 1 / -1;
     grid-row: 2;
@@ -1001,6 +1030,12 @@ main {
   .nav-links {
     gap: 22px;
     font-size: 0.82rem;
+  }
+
+  .header-phone {
+    min-height: 38px;
+    padding: 0 12px;
+    font-size: 1rem;
   }
 
   .hero {
