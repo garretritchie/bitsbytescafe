@@ -3,6 +3,11 @@ const lightboxImage = document.querySelector(".lightbox img");
 const lightboxClose = document.querySelector(".lightbox-close");
 const menuFilterButtons = document.querySelectorAll("[data-menu-filter]");
 const plateCards = document.querySelectorAll("[data-menu-category]");
+const currentYear = document.querySelector("[data-current-year]");
+
+if (currentYear) {
+  currentYear.textContent = new Date().getFullYear();
+}
 
 menuFilterButtons.forEach((button) => {
   button.addEventListener("click", () => {
