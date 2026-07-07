@@ -645,9 +645,9 @@ a {
   position: relative;
   overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(250px, 0.8fr) minmax(420px, 1.2fr);
-  gap: 24px;
-  align-items: center;
+  grid-template-columns: 1fr;
+  gap: 22px;
+  align-items: start;
   color: #fff;
   background:
     linear-gradient(135deg, rgba(21, 21, 21, 0.1), rgba(21, 21, 21, 0)),
@@ -663,12 +663,14 @@ a {
 
 .visit-cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(190px, 1fr));
   gap: 1px;
+  width: 100%;
   border: 0;
   border-radius: 0;
   background: rgba(255, 255, 255, 0.28);
   box-shadow: none;
+  overflow-x: auto;
 }
 
 .visit-cards article {
@@ -680,6 +682,7 @@ a {
   padding: 8px 12px;
   color: #fff;
   background: transparent;
+  white-space: nowrap;
 }
 
 .visit-cards span {
@@ -706,6 +709,8 @@ a {
   font-size: 0.9rem;
   font-weight: 700;
   text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .social-panel {
@@ -943,10 +948,6 @@ a {
   }
 
   .site-footer {
-    grid-template-columns: 1fr;
-  }
-
-  .visit-cards {
     grid-template-columns: 1fr;
   }
 }
