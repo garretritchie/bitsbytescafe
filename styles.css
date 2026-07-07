@@ -34,7 +34,6 @@ body {
 .site-inlay {
   width: min(1220px, calc(100vw - 72px));
   margin: 0 auto;
-  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 28px;
   background: #fff;
@@ -58,7 +57,8 @@ main {
 }
 
 .site-header {
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 30;
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -887,6 +887,42 @@ main {
   cursor: pointer;
 }
 
+.back-to-top {
+  position: fixed;
+  right: clamp(18px, 3vw, 34px);
+  bottom: clamp(18px, 3vw, 34px);
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  border-radius: 50%;
+  color: #fff;
+  background: var(--orange);
+  box-shadow:
+    0 18px 34px rgba(82, 52, 20, 0.28),
+    0 4px 12px rgba(82, 52, 20, 0.18);
+  font-size: 1.9rem;
+  font-weight: 900;
+  line-height: 1;
+  text-decoration: none;
+  transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.back-to-top:hover,
+.back-to-top:focus-visible {
+  background: var(--orange-dark);
+  box-shadow:
+    0 22px 44px rgba(82, 52, 20, 0.34),
+    0 6px 14px rgba(82, 52, 20, 0.22);
+  transform: translateY(-3px);
+}
+
+.back-to-top span {
+  transform: translateY(-2px);
+}
+
 @media (max-width: 1180px) {
   :root {
     --container: calc(100vw - 96px);
@@ -1021,6 +1057,12 @@ main {
   .site-header {
     min-height: 78px;
     padding: 12px 16px;
+  }
+
+  .back-to-top {
+    width: 48px;
+    height: 48px;
+    font-size: 1.6rem;
   }
 
   .brand-logo-wide {

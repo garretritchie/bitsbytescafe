@@ -4,6 +4,7 @@ const lightboxClose = document.querySelector(".lightbox-close");
 const menuFilterButtons = document.querySelectorAll("[data-menu-filter]");
 const plateCards = document.querySelectorAll("[data-menu-category]");
 const currentYear = document.querySelector("[data-current-year]");
+const backToTop = document.querySelector(".back-to-top");
 
 if (currentYear) {
   currentYear.textContent = new Date().getFullYear();
@@ -52,4 +53,12 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !lightbox.hidden) {
     closeLightbox();
   }
+});
+
+backToTop?.addEventListener("click", (event) => {
+  event.preventDefault();
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth",
+  });
 });
