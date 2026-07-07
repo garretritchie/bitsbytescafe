@@ -131,23 +131,15 @@ a {
 .hero h1 {
   max-width: 680px;
   margin: 0;
+  font-size: clamp(3rem, 6vw, 5.6rem);
+  line-height: 0.94;
+  letter-spacing: 0;
+  font-weight: 900;
 }
 
-.hero-logo-title img {
-  width: min(640px, 100%);
-  height: auto;
-}
-
-.hero-lede {
-  margin: 24px 0 10px;
-  font-size: clamp(1.35rem, 2vw, 2rem);
-  line-height: 1.2;
-  font-weight: 850;
-}
-
-.hero-copy p:not(.hero-lede) {
+.hero-copy p {
   max-width: 520px;
-  margin: 0;
+  margin: 20px 0 0;
   color: #333;
   font-size: clamp(1.03rem, 1.4vw, 1.24rem);
   line-height: 1.55;
@@ -671,7 +663,7 @@ a {
   }
 
   .hero h1 {
-    font-size: clamp(3rem, 16vw, 4.2rem);
+    font-size: clamp(2.85rem, 13vw, 4.1rem);
   }
 
   .hero-media {
