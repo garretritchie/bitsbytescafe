@@ -105,10 +105,16 @@
         setLoading(true);
         setError('');
         try {
-          await apiFetch('/api/auth/login', {
+          // Use URLSearchParams so the request is form-encoded — avoids proxy issues
+          const body = new URLSearchParams({ username, password });
+          const res = await fetch('/api/auth/login', {
             method: 'POST',
-            body: JSON.stringify({ username, password }),
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString(),
           });
+          let data;
+          try { data = await res.json(); } catch { data = {}; }
+          if (!res.ok) throw new Error(data.error || 'Invalid username or password');
           onLogin();
         } catch (err) {
           setError(err.message);
@@ -119,6 +125,9 @@
 
       return (
         <div className="login-page">
+          <div className="login-bg" aria-hidden="true">
+            <img src="/images/74604694_795940760878125_3195495164743254016_n.jpg" alt="" />
+          </div>
           <div className="login-card">
             <div className="login-logo">
               <img src="/images/bits-bytes-logo-wide-cropped.png" alt="Bits and Bytes Cafe" />
@@ -130,7 +139,7 @@
               <div className="form-group">
                 <label htmlFor="un">Username</label>
                 <input id="un" type="text" value={username} onChange={e => setUsername(e.target.value)}
-                  placeholder="admin" required autoFocus autoComplete="username" />
+                  placeholder="Username" required autoFocus autoComplete="username" />
               </div>
               <div className="form-group">
                 <label htmlFor="pw">Password</label>
@@ -141,9 +150,7 @@
                 {loading ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
-            <p style={{ marginTop: 16, fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>
-              Default: admin / password123
-            </p>
+            <a href="/" className="login-back-link">← Back to website</a>
           </div>
         </div>
       );
