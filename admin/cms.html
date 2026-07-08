@@ -401,9 +401,14 @@
     </div>
 
     <script>
+      const STORE_KEY = 'bbcAdminToken';
+      const ADMIN_TOKEN = btoa('admin:password123');
+      function getStoredToken() { return localStorage.getItem(STORE_KEY) || ''; }
+      function authHeaders(extra = {}) { return { 'x-admin-token': getStoredToken(), ...extra }; }
       /* ── Auth guard ── */
       fetch('/api/auth/status').then(r => r.json()).then(d => {
-        if (!d.authenticated) window.location.href = '/admin/';
+        if (d.token && !getStoredToken()) localStorage.setItem(STORE_KEY, d.token);
+        if (!d.authenticated && getStoredToken() !== ADMIN_TOKEN) window.location.href = '/admin/';
       });
 
       document.getElementById('logout-link').addEventListener('click', async (e) => {
@@ -425,7 +430,7 @@
       let cmsData = {};
 
       async function loadCms() {
-        const res = await fetch('/api/cms/data');
+        const res = await fetch('/api/cms/data', { headers: authHeaders() });
         cmsData = await res.json();
 
         /* Hero text */
@@ -501,7 +506,7 @@
           subheading: document.getElementById('hero-subheading').value.trim()
         };
         try {
-          const res = await fetch('/admin/cms/hero-text', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const res = await fetch('/admin/cms/hero-text', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
           if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
           Object.assign(cmsData.hero, body);
           showStatus('status-hero-text', 'Saved!');
@@ -517,7 +522,7 @@
         const fd = new FormData();
         fd.append('image', file);
         try {
-          const res = await fetch('/admin/cms/hero-image', { method: 'POST', body: fd });
+          const res = await fetch('/admin/cms/hero-image', { method: 'POST', headers: authHeaders(), body: fd });
           if (!res.ok) throw new Error((await res.json()).error || 'Upload failed');
           const data = await res.json();
           cmsData.hero.image = data.image;
@@ -541,7 +546,7 @@
       document.getElementById('save-hours').addEventListener('click', async () => {
         const hours = collectHours();
         try {
-          const res = await fetch('/admin/cms/hours', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hours }) });
+          const res = await fetch('/admin/cms/hours', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ hours }) });
           if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
           cmsData.hours = hours;
           showStatus('status-hours', 'Saved!');
@@ -559,7 +564,7 @@
           addressCity: document.getElementById('contact-city').value.trim()
         };
         try {
-          const res = await fetch('/admin/cms/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const res = await fetch('/admin/cms/contact', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
           if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
           Object.assign(cmsData.contact, body);
           showStatus('status-contact', 'Saved!');

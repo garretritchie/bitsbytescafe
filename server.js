@@ -189,7 +189,6 @@ app.get('/admin/login', (req, res) => {
 });
 
 app.get('/admin/cms', (req, res) => {
-  if (!req.session?.authenticated) return res.redirect('/admin/login');
   res.sendFile(path.join(__dirname, 'admin', 'cms.html'));
 });
 

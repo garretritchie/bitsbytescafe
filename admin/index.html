@@ -39,6 +39,12 @@
       return item.price || '';
     }
 
+    function assetUrl(src) {
+      if (!src) return '';
+      if (/^(https?:|data:|blob:|\/)/.test(src)) return src;
+      return `/${src.replace(/^\/+/, '')}`;
+    }
+
     async function apiFetch(url, opts = {}) {
       const res = await fetch(url, {
         headers: {
@@ -204,6 +210,10 @@
               <span className="sidebar-nav-icon">📷</span>
               Photo Gallery
             </button>
+            <a className="sidebar-nav-item" href="/admin/cms">
+              <span className="sidebar-nav-icon">Edit</span>
+              Site Content
+            </a>
           </nav>
           <div className="sidebar-footer">
             <button className="sidebar-logout" onClick={onLogout}>
@@ -229,7 +239,7 @@
       const [seasonal, setSeasonal] = useState(item?.seasonal || false);
       const [available, setAvailable] = useState(item?.available !== false);
       const [imageFile, setImageFile] = useState(null);
-      const [imagePreview, setImagePreview] = useState(item?.image || '');
+      const [imagePreview, setImagePreview] = useState(assetUrl(item?.image || ''));
       const [imageDrag, setImageDrag] = useState(false);
       const fileRef = useRef();
 
@@ -519,7 +529,7 @@
               {filtered.map(item => (
                 <div key={item.id} className="menu-card" style={{ opacity: item.available ? 1 : 0.6 }}>
                   {item.image
-                    ? <img className="menu-card-image" src={item.image} alt={item.imageAlt || item.name} loading="lazy" />
+                    ? <img className="menu-card-image" src={assetUrl(item.image)} alt={item.imageAlt || item.name} loading="lazy" />
                     : <div className="menu-card-image-placeholder">🍽</div>
                   }
                   <div className="menu-card-body">
@@ -730,7 +740,7 @@
                   const isDirty = item.id in captionEdits && captionEdits[item.id] !== item.caption;
                   return (
                     <div key={item.id} className="gallery-card-admin">
-                      <img className="gallery-card-image" src={item.src} alt={item.caption || 'Gallery photo'} loading="lazy" />
+                      <img className="gallery-card-image" src={assetUrl(item.src)} alt={item.caption || 'Gallery photo'} loading="lazy" />
                       <div className="gallery-card-body">
                         <textarea
                           className="gallery-caption-input"

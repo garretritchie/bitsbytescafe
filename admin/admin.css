@@ -379,7 +379,8 @@ body {
   padding: 8px 10px;
 }
 
-.sidebar-nav-item {
+.sidebar-nav-item,
+.sidebar-link {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -395,15 +396,18 @@ body {
   font-weight: 500;
   cursor: pointer;
   text-align: left;
+  text-decoration: none;
   transition: background 150ms, color 150ms, border-color 150ms;
 }
 
-.sidebar-nav-item:hover {
+.sidebar-nav-item:hover,
+.sidebar-link:hover {
   background: var(--sidebar-hover);
   color: var(--sidebar-text-hover);
 }
 
-.sidebar-nav-item.active {
+.sidebar-nav-item.active,
+.sidebar-link.is-active {
   background: var(--sidebar-active);
   color: #fff;
   border-left-color: var(--sidebar-active-border);
