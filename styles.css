@@ -1604,7 +1604,8 @@ main {
   }
 
   .button {
-    min-width: 142px;
+    width: 100%;
+    min-width: 0;
     min-height: 44px;
     padding: 0 18px;
     font-size: 0.9rem;
@@ -1612,10 +1613,13 @@ main {
 
   .hero-actions {
     flex-wrap: wrap;
+    width: min(100%, 244px);
   }
 
   .button.secondary {
-    min-width: min(100%, 232px);
+    min-width: 0;
+    font-size: 0.84rem;
+    white-space: nowrap;
   }
 
   .hero-media {
