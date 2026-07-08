@@ -522,21 +522,23 @@ app.get('/api/sections', requireAuth, async (req, res) => {
 });
 
 app.put('/api/sections/:key', requireAuth, async (req, res) => {
-  const b = req.body;
-  const { data: existing } = await supabase.from('website_sections').select('id').eq('section_key',req.params.key).maybeSingle();
-  const payload = { section_key:req.params.key, title:b.title||'', subtitle:b.subtitle||'',
-    body:b.body||'', button_label:b.button_label||'', button_url:b.button_url||'',
-    image_url:b.image_url||'', display_order:parseInt(b.display_order)||0,
-    is_active:b.is_active!==false, metadata:b.metadata||{}, updated_at:new Date().toISOString() };
-  let result;
-  if (existing?.id) {
-    result = await supabase.from('website_sections').update(payload).eq('id',existing.id).select().single();
-  } else {
-    result = await supabase.from('website_sections').insert(payload).select().single();
-  }
-  if (result.error) return res.status(500).json({ error: result.error.message });
-  await logActivity('content_updated','section',req.params.key,`Section "${req.params.key}" updated`);
-  res.json(result.data);
+  try {
+    const b = req.body;
+    const { data: existing } = await supabase.from('website_sections').select('id').eq('section_key',req.params.key).maybeSingle();
+    const payload = { section_key:req.params.key, title:b.title||'', subtitle:b.subtitle||'',
+      body:b.body||'', button_label:b.button_label||'', button_url:b.button_url||'',
+      image_url:b.image_url||'', display_order:parseInt(b.display_order)||0,
+      is_active:b.is_active!==false, metadata:b.metadata||{}, updated_at:new Date().toISOString() };
+    let result;
+    if (existing?.id) {
+      result = await supabase.from('website_sections').update(payload).eq('id',existing.id).select().single();
+    } else {
+      result = await supabase.from('website_sections').insert(payload).select().single();
+    }
+    if (result.error) return res.status(500).json({ error: result.error.message });
+    await logActivity('content_updated','section',req.params.key,`Section "${req.params.key}" updated`);
+    res.json(result.data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Social Links ──────────────────────────────────────────────────────────────
@@ -604,12 +606,14 @@ app.post('/api/gallery', requireAuth, upload.single('photo'), async (req, res) =
 });
 
 app.patch('/api/gallery/:id', requireAuth, async (req, res) => {
-  const { data, error } = await supabase.from('media_assets').update({
-    caption: req.body.caption?.trim()||'', alt_text: req.body.caption?.trim()||'',
-    updated_at: new Date().toISOString()
-  }).eq('id',req.params.id).select().single();
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ id:data.id, filename:data.file_name, src:data.file_url, caption:data.caption });
+  try {
+    const { data, error } = await supabase.from('media_assets').update({
+      caption: req.body.caption?.trim()||'', alt_text: req.body.caption?.trim()||'',
+      updated_at: new Date().toISOString()
+    }).eq('id',req.params.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ id:data.id, filename:data.file_name, src:data.file_url, caption:data.caption });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/gallery/:id', requireAuth, async (req, res) => {
