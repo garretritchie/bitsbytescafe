@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/admin/admin.css">
 </head>
 <body>
-  <div id="root"><div class="init-loading">Loading admin panel…</div></div>
+  <div id="root"><div class="init-loading"><div class="spinner"></div></div></div>
 
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -27,8 +27,10 @@
     function clearStoredToken() { localStorage.removeItem(STORE_KEY); }
 
     /* ── HELPERS ── */
-    function esc(str) {
-      return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    function assetUrl(src) {
+      if (!src) return '';
+      if (/^(https?:|data:|blob:|\/)/.test(src)) return src;
+      return `/${src.replace(/^\/+/, '')}`;
     }
 
     function formatPrice(item) {
@@ -40,40 +42,40 @@
       return item.price || '';
     }
 
-    function assetUrl(src) {
-      if (!src) return '';
-      if (/^(https?:|data:|blob:|\/)/.test(src)) return src;
-      return `/${src.replace(/^\/+/, '')}`;
-    }
-
     function sortMenuItemsForDisplay(items) {
       const categoryOrder = new Map();
-      items.forEach((item) => {
-        if (!categoryOrder.has(item.category)) categoryOrder.set(item.category, categoryOrder.size);
-      });
-
-      return items
-        .map((item, index) => ({ item, index }))
+      items.forEach(item => { if (!categoryOrder.has(item.category)) categoryOrder.set(item.category, categoryOrder.size); });
+      return items.map((item, index) => ({ item, index }))
         .sort((a, b) => {
-          const categoryDiff = categoryOrder.get(a.item.category) - categoryOrder.get(b.item.category);
-          if (categoryDiff !== 0) return categoryDiff;
-
-          const photoDiff = Number(Boolean(b.item.image)) - Number(Boolean(a.item.image));
-          if (photoDiff !== 0) return photoDiff;
-
+          const cd = categoryOrder.get(a.item.category) - categoryOrder.get(b.item.category);
+          if (cd !== 0) return cd;
+          const pd = Number(Boolean(b.item.image)) - Number(Boolean(a.item.image));
+          if (pd !== 0) return pd;
           return a.index - b.index;
         })
         .map(({ item }) => item);
     }
 
+    function timeAgo(ts) {
+      if (!ts) return '';
+      const diff = Date.now() - new Date(ts).getTime();
+      const m = Math.floor(diff / 60000);
+      if (m < 1) return 'just now';
+      if (m < 60) return `${m}m ago`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `${h}h ago`;
+      return `${Math.floor(h / 24)}d ago`;
+    }
+
+    function dayLabel(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
     async function apiFetch(url, opts = {}) {
       const res = await fetch(url, {
         ...opts,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': getStoredToken(),
-          ...opts.headers
-        }
+        headers: { 'Content-Type': 'application/json', 'x-admin-token': getStoredToken(), ...opts.headers }
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Request failed ${res.status}`);
@@ -83,10 +85,7 @@
     async function apiFormFetch(url, opts = {}) {
       const res = await fetch(url, {
         ...opts,
-        headers: {
-          'x-admin-token': getStoredToken(),
-          ...opts.headers
-        }
+        headers: { 'x-admin-token': getStoredToken(), ...opts.headers }
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Request failed ${res.status}`);
@@ -118,7 +117,7 @@
     }
 
     /* ── CONFIRM DIALOG ── */
-    function ConfirmDialog({ title, message, onConfirm, onCancel }) {
+    function ConfirmDialog({ title, message, onConfirm, onCancel, confirmLabel = 'Delete', confirmClass = 'btn-danger' }) {
       return (
         <div className="confirm-overlay" onClick={onCancel}>
           <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
@@ -126,7 +125,7 @@
             <p>{message}</p>
             <div className="confirm-dialog-actions">
               <button className="btn btn-secondary" onClick={onCancel}>Cancel</button>
-              <button className="btn btn-danger" onClick={onConfirm}>Delete</button>
+              <button className={`btn ${confirmClass}`} onClick={onConfirm}>{confirmLabel}</button>
             </div>
           </div>
         </div>
@@ -143,147 +142,526 @@
       );
     }
 
-    /* ── LOGIN ── */
-    function Login({ onLogin }) {
-      const [username, setUsername] = useState('');
-      const [password, setPassword] = useState('');
-      const [error, setError] = useState(() => {
-        const p = new URLSearchParams(window.location.search);
-        return p.get('error') ? 'Invalid username or password.' : '';
-      });
-      const [loading, setLoading] = useState(false);
-      const formRef = React.useRef();
+    /* ── SIDEBAR ── */
+    const NAV_ITEMS = [
+      { id: 'dashboard', label: 'Dashboard', icon: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', group: null },
+      { id: 'menu', label: 'Menu', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', group: 'content' },
+      { id: 'categories', label: 'Categories', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', group: 'content' },
+      { id: 'specials', label: 'Specials', icon: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z', group: 'content' },
+      { id: 'gallery', label: 'Gallery', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', group: 'content' },
+      { id: 'content', label: 'Website Content', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', group: 'settings' },
+      { id: 'settings', label: 'Business Settings', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', group: 'settings' },
+      { id: 'analytics', label: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', group: 'settings' },
+      { id: 'users', label: 'Users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', group: 'settings' },
+    ];
 
-      async function handleSubmit(e) {
-        e.preventDefault();
-        setLoading(true);
-        setError('');
-        try {
-          const body = new URLSearchParams({ username, password });
-          const res = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
-            body: body.toString(),
-            credentials: 'same-origin',
-          });
-          // If fetch is intercepted and returns non-JSON, fall back to native form POST
-          const ct = res.headers.get('content-type') || '';
-          if (!ct.includes('application/json')) {
-            formRef.current.submit();
-            return;
-          }
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Invalid username or password.');
-          onLogin();
-        } catch (err) {
-          if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-            formRef.current.submit();
-            return;
-          }
-          setError(err.message);
-          setLoading(false);
-        }
-      }
+    function SidebarIcon({ d }) {
+      return (
+        <svg className="sidebar-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          {d.split(' M').map((segment, i) => (
+            <path key={i} d={i === 0 ? segment : 'M' + segment} />
+          ))}
+        </svg>
+      );
+    }
+
+    function Sidebar({ page, setPage, onLogout, mobileOpen, onMobileClose }) {
+      const contentItems = NAV_ITEMS.filter(i => i.group === 'content');
+      const settingsItems = NAV_ITEMS.filter(i => i.group === 'settings');
+      const dashItem = NAV_ITEMS.find(i => i.id === 'dashboard');
 
       return (
-        <div className="login-page">
-          <div className="login-bg" aria-hidden="true">
-            <img src="/images/74604694_795940760878125_3195495164743254016_n.jpg" alt="" />
-          </div>
-          <div className="login-card">
-            <div className="login-logo">
+        <>
+          {mobileOpen && <div className="sidebar-backdrop" onClick={onMobileClose} />}
+          <aside className={`sidebar${mobileOpen ? ' sidebar-open' : ''}`}>
+            <div className="sidebar-brand">
               <img src="/images/bits-bytes-logo-wide-cropped.png" alt="Bits and Bytes Cafe" />
             </div>
-            <h1>Admin Panel</h1>
-            <p className="login-sub">Sign in to manage your restaurant content</p>
-            {error && <div className="alert alert-error">{error}</div>}
-            {/* Native form for fallback — action points to the redirect-capable server route */}
-            <form ref={formRef} action="/api/auth/login" method="POST" onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label htmlFor="un">Username</label>
-                <input id="un" name="username" type="text" value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  placeholder="Username" required autoFocus autoComplete="username" />
-              </div>
-              <div className="form-group">
-                <label htmlFor="pw">Password</label>
-                <input id="pw" name="password" type="password" value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••" required autoComplete="current-password" />
-              </div>
-              <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
-                {loading ? 'Signing in…' : 'Sign in'}
+
+            <nav className="sidebar-nav">
+              <button
+                className={`sidebar-nav-item${page === 'dashboard' ? ' active' : ''}`}
+                onClick={() => { setPage('dashboard'); onMobileClose(); }}
+              >
+                <SidebarIcon d={dashItem.icon} />
+                Dashboard
               </button>
-            </form>
-            <a href="/" className="login-back-link">← Back to website</a>
+
+              <div className="sidebar-section-label">Content</div>
+              {contentItems.map(item => (
+                <button
+                  key={item.id}
+                  className={`sidebar-nav-item${page === item.id ? ' active' : ''}`}
+                  onClick={() => { setPage(item.id); onMobileClose(); }}
+                >
+                  <SidebarIcon d={item.icon} />
+                  {item.label}
+                </button>
+              ))}
+
+              <div className="sidebar-section-label">Manage</div>
+              {settingsItems.map(item => (
+                <button
+                  key={item.id}
+                  className={`sidebar-nav-item${page === item.id ? ' active' : ''}`}
+                  onClick={() => { setPage(item.id); onMobileClose(); }}
+                >
+                  <SidebarIcon d={item.icon} />
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="sidebar-footer">
+              <a href="/" target="_blank" rel="noopener" className="sidebar-nav-item">
+                <svg className="sidebar-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+                </svg>
+                View Live Site
+              </a>
+              <button className="sidebar-logout" onClick={onLogout}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+                </svg>
+                Sign out
+              </button>
+            </div>
+          </aside>
+        </>
+      );
+    }
+
+    /* ── DASHBOARD PAGE ── */
+    function DashboardPage({ setPage, showToast }) {
+      const [stats, setStats] = useState(null);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        apiFetch('/api/dashboard')
+          .then(setStats)
+          .catch(err => showToast(err.message, 'error'))
+          .finally(() => setLoading(false));
+      }, []);
+
+      const actionLabels = {
+        content_created: 'Created', content_updated: 'Updated', content_disabled: 'Disabled',
+        admin_login: 'Login', user_created: 'User added', user_updated: 'User updated',
+        user_disabled: 'User disabled'
+      };
+
+      if (loading) return <div className="loading-state"><div className="spinner"></div><span>Loading dashboard…</span></div>;
+
+      return (
+        <div className="dashboard-page">
+          <div className="summary-tiles">
+            <div className="summary-tile">
+              <div className="summary-tile-icon" style={{ background: 'var(--orange-light)', color: 'var(--orange)' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+              </div>
+              <div className="summary-tile-body">
+                <div className="summary-tile-value">{stats?.totalItems ?? 0}</div>
+                <div className="summary-tile-label">Menu Items</div>
+              </div>
+              <button className="summary-tile-link" onClick={() => setPage('menu')}>Manage →</button>
+            </div>
+            <div className="summary-tile">
+              <div className="summary-tile-icon" style={{ background: 'var(--green-light)', color: 'var(--green)' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <div className="summary-tile-body">
+                <div className="summary-tile-value">{stats?.availableItems ?? 0}</div>
+                <div className="summary-tile-label">Available Items</div>
+              </div>
+              <button className="summary-tile-link" onClick={() => setPage('menu')}>View →</button>
+            </div>
+            <div className="summary-tile">
+              <div className="summary-tile-icon" style={{ background: 'var(--yellow-light)', color: 'var(--yellow)' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
+              </div>
+              <div className="summary-tile-body">
+                <div className="summary-tile-value">{stats?.activeSpecials ?? 0}</div>
+                <div className="summary-tile-label">Active Specials</div>
+              </div>
+              <button className="summary-tile-link" onClick={() => setPage('specials')}>Manage →</button>
+            </div>
+            <div className="summary-tile">
+              <div className="summary-tile-icon" style={{ background: 'var(--blue-light)', color: 'var(--blue)' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              </div>
+              <div className="summary-tile-body">
+                <div className="summary-tile-value">{stats?.recentPageViews ?? 0}</div>
+                <div className="summary-tile-label">Page Views (7d)</div>
+              </div>
+              <button className="summary-tile-link" onClick={() => setPage('analytics')}>Analytics →</button>
+            </div>
+          </div>
+
+          <div className="dashboard-grid">
+            <div className="dashboard-card">
+              <div className="dashboard-card-header">
+                <h3>Recent Activity</h3>
+              </div>
+              <div className="activity-list">
+                {(!stats?.recentActivity || stats.recentActivity.length === 0) ? (
+                  <div className="activity-empty">No activity yet.</div>
+                ) : stats.recentActivity.slice(0, 10).map(entry => (
+                  <div key={entry.id} className="activity-item">
+                    <div className="activity-dot"></div>
+                    <div className="activity-body">
+                      <div className="activity-summary">{entry.summary}</div>
+                      <div className="activity-time">{timeAgo(entry.created_at)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="dashboard-card">
+              <div className="dashboard-card-header">
+                <h3>Quick Links</h3>
+              </div>
+              <div className="quick-links">
+                {[
+                  { label: 'Add Menu Item', page: 'menu', desc: 'Add a new item to the menu' },
+                  { label: 'Manage Categories', page: 'categories', desc: 'Edit menu categories' },
+                  { label: 'Add Special', page: 'specials', desc: 'Create a promotional special' },
+                  { label: 'Upload Photo', page: 'gallery', desc: 'Add photos to the gallery' },
+                  { label: 'Edit Business Info', page: 'settings', desc: 'Hours, phone, address' },
+                  { label: 'View Analytics', page: 'analytics', desc: 'See traffic and engagement' },
+                ].map(link => (
+                  <button key={link.page} className="quick-link-item" onClick={() => setPage(link.page)}>
+                    <div className="quick-link-label">{link.label}</div>
+                    <div className="quick-link-desc">{link.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       );
     }
 
-    /* ── SIDEBAR ── */
-    function Sidebar({ page, setPage, onLogout }) {
+    /* ── CATEGORIES PAGE ── */
+    function CategoriesPage({ showToast }) {
+      const [cats, setCats] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [modal, setModal] = useState(null);
+      const [saving, setSaving] = useState(false);
+      const [deleteTarget, setDeleteTarget] = useState(null);
+      const [form, setForm] = useState({ name: '', slug: '', description: '', display_order: 0 });
+
+      async function load() {
+        setLoading(true);
+        try { setCats(await apiFetch('/api/categories')); }
+        catch (err) { showToast(err.message, 'error'); }
+        finally { setLoading(false); }
+      }
+
+      useEffect(() => { load(); }, []);
+
+      function openAdd() { setForm({ name: '', slug: '', description: '', display_order: cats.length }); setModal('add'); }
+      function openEdit(cat) { setForm({ name: cat.name, slug: cat.slug, description: cat.description || '', display_order: cat.display_order || 0 }); setModal(cat); }
+
+      async function handleSave() {
+        setSaving(true);
+        try {
+          if (modal === 'add') {
+            const created = await apiFetch('/api/categories', { method: 'POST', body: JSON.stringify(form) });
+            setCats(prev => [...prev, created]);
+            showToast('Category created');
+          } else {
+            const updated = await apiFetch(`/api/categories/${modal.id}`, { method: 'PUT', body: JSON.stringify({ ...form, is_active: true }) });
+            setCats(prev => prev.map(c => c.id === updated.id ? updated : c));
+            showToast('Category updated');
+          }
+          setModal(null);
+        } catch (err) { showToast(err.message, 'error'); }
+        finally { setSaving(false); }
+      }
+
+      async function handleDisable(cat) {
+        try {
+          await apiFetch(`/api/categories/${cat.id}`, { method: 'DELETE' });
+          setCats(prev => prev.map(c => c.id === cat.id ? { ...c, is_active: false } : c));
+          showToast('Category disabled');
+        } catch (err) { showToast(err.message, 'error'); }
+        setDeleteTarget(null);
+      }
+
+      function slugify(name) { return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
+
       return (
-        <aside className="sidebar">
-          <div className="sidebar-brand">
-            <img src="/images/bits-bytes-logo-wide-cropped.png" alt="Bits and Bytes Cafe" />
+        <div>
+          <div className="toolbar">
+            <div className="toolbar-left" />
+            <div className="toolbar-right">
+              <button className="btn btn-primary" onClick={openAdd}>+ Add Category</button>
+            </div>
           </div>
-          <div className="sidebar-label">Content</div>
-          <nav className="sidebar-nav">
-            <a className="sidebar-nav-item" href="/admin/cms">
-              <svg className="sidebar-nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-              Site Content
-            </a>
-            <button
-              className={`sidebar-nav-item${page === 'menu' ? ' active' : ''}`}
-              onClick={() => {
-                setPage('menu');
-                window.location.hash = 'menu';
-              }}
-            >
-              <span className="sidebar-nav-icon">🍽</span>
-              Menu Manager
-            </button>
-            <button
-              className={`sidebar-nav-item${page === 'gallery' ? ' active' : ''}`}
-              onClick={() => {
-                setPage('gallery');
-                window.location.hash = 'gallery';
-              }}
-            >
-              <span className="sidebar-nav-icon">📷</span>
-              Photo Gallery
-            </button>
-          </nav>
-          <div className="sidebar-footer">
-            <button className="sidebar-logout" onClick={onLogout}>
-              <span>↩</span> Sign out
-            </button>
+
+          {loading ? (
+            <div className="loading-state"><div className="spinner"></div><span>Loading…</span></div>
+          ) : (
+            <div className="table-card">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Slug</th>
+                    <th>Order</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cats.length === 0 ? (
+                    <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: 32 }}>No categories yet.</td></tr>
+                  ) : cats.map(cat => (
+                    <tr key={cat.id}>
+                      <td style={{ fontWeight: 600 }}>{cat.name}</td>
+                      <td><code className="code-badge">{cat.slug}</code></td>
+                      <td>{cat.display_order}</td>
+                      <td>
+                        <span className={`badge ${cat.is_active !== false ? 'badge-green' : 'badge-red'}`}>
+                          {cat.is_active !== false ? 'Active' : 'Disabled'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => openEdit(cat)}>Edit</button>
+                        {cat.is_active !== false && (
+                          <button className="btn btn-ghost btn-sm" style={{ marginLeft: 6 }} onClick={() => setDeleteTarget(cat)}>Disable</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {modal && (
+            <div className="modal-overlay" onClick={() => setModal(null)}>
+              <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h2>{modal === 'add' ? 'New Category' : `Edit: ${modal.name}`}</h2>
+                  <button className="modal-close" onClick={() => setModal(null)}>×</button>
+                </div>
+                <div className="modal-body">
+                  <div className="form-group">
+                    <label>Name <span className="required">*</span></label>
+                    <input type="text" value={form.name} onChange={e => { const v = e.target.value; setForm(f => ({ ...f, name: v, slug: modal === 'add' ? slugify(v) : f.slug })); }} placeholder="e.g. Breakfast" />
+                  </div>
+                  <div className="form-group">
+                    <label>Slug</label>
+                    <input type="text" value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} placeholder="e.g. breakfast" />
+                    <div className="form-hint">Used in URLs. Auto-generated from name.</div>
+                  </div>
+                  <div className="form-group">
+                    <label>Description</label>
+                    <textarea rows={2} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
+                  </div>
+                  <div className="form-group">
+                    <label>Display Order</label>
+                    <input type="number" value={form.display_order} onChange={e => setForm(f => ({ ...f, display_order: parseInt(e.target.value)||0 }))} min={0} />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setModal(null)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={handleSave} disabled={saving || !form.name.trim()}>
+                    {saving ? 'Saving…' : (modal === 'add' ? 'Create' : 'Save')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {deleteTarget && (
+            <ConfirmDialog
+              title="Disable category?"
+              message={`"${deleteTarget.name}" will be hidden. Existing menu items keep their category assignment.`}
+              confirmLabel="Disable"
+              confirmClass="btn-ghost"
+              onConfirm={() => handleDisable(deleteTarget)}
+              onCancel={() => setDeleteTarget(null)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    /* ── SPECIALS PAGE ── */
+    function SpecialsPage({ showToast }) {
+      const [items, setItems] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [modal, setModal] = useState(null);
+      const [saving, setSaving] = useState(false);
+      const [deleteTarget, setDeleteTarget] = useState(null);
+      const emptyForm = { title: '', description: '', image_url: '', start_date: '', end_date: '', is_active: true, cta_label: '', cta_url: '', display_order: 0 };
+      const [form, setForm] = useState(emptyForm);
+
+      async function load() {
+        setLoading(true);
+        try { setItems(await apiFetch('/api/specials')); }
+        catch (err) { showToast(err.message, 'error'); }
+        finally { setLoading(false); }
+      }
+
+      useEffect(() => { load(); }, []);
+
+      function openAdd() { setForm({ ...emptyForm, display_order: items.length }); setModal('add'); }
+      function openEdit(item) { setForm({ title: item.title, description: item.description||'', image_url: item.image_url||'', start_date: item.start_date||'', end_date: item.end_date||'', is_active: item.is_active, cta_label: item.cta_label||'', cta_url: item.cta_url||'', display_order: item.display_order||0 }); setModal(item); }
+
+      async function handleSave() {
+        setSaving(true);
+        try {
+          if (modal === 'add') {
+            const created = await apiFetch('/api/specials', { method: 'POST', body: JSON.stringify(form) });
+            setItems(prev => [...prev, created]);
+            showToast('Special created');
+          } else {
+            const updated = await apiFetch(`/api/specials/${modal.id}`, { method: 'PUT', body: JSON.stringify(form) });
+            setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
+            showToast('Special updated');
+          }
+          setModal(null);
+        } catch (err) { showToast(err.message, 'error'); }
+        finally { setSaving(false); }
+      }
+
+      async function handleDelete(item) {
+        try {
+          await apiFetch(`/api/specials/${item.id}`, { method: 'DELETE' });
+          setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_active: false } : i));
+          showToast('Special disabled');
+        } catch (err) { showToast(err.message, 'error'); }
+        setDeleteTarget(null);
+      }
+
+      return (
+        <div>
+          <div className="toolbar">
+            <div className="toolbar-left" />
+            <div className="toolbar-right">
+              <button className="btn btn-primary" onClick={openAdd}>+ New Special</button>
+            </div>
           </div>
-        </aside>
+
+          {loading ? (
+            <div className="loading-state"><div className="spinner"></div><span>Loading…</span></div>
+          ) : items.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">⭐</div>
+              <h3>No specials yet</h3>
+              <p>Create a promotional special to highlight on your menu.</p>
+              <button className="btn btn-primary" onClick={openAdd}>Add First Special</button>
+            </div>
+          ) : (
+            <div className="specials-grid">
+              {items.map(item => (
+                <div key={item.id} className={`special-card${!item.is_active ? ' special-card-inactive' : ''}`}>
+                  {item.image_url && <img className="special-card-image" src={assetUrl(item.image_url)} alt={item.title} loading="lazy" />}
+                  <div className="special-card-body">
+                    <div className="special-card-head">
+                      <div className="special-card-title">{item.title}</div>
+                      <span className={`badge ${item.is_active ? 'badge-green' : 'badge-gray'}`}>{item.is_active ? 'Active' : 'Inactive'}</span>
+                    </div>
+                    {item.description && <div className="special-card-desc">{item.description}</div>}
+                    {(item.start_date || item.end_date) && (
+                      <div className="special-card-dates">
+                        {item.start_date && <span>From {item.start_date}</span>}
+                        {item.end_date && <span> · Until {item.end_date}</span>}
+                      </div>
+                    )}
+                    <div className="special-card-actions">
+                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(item)}>Edit</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setDeleteTarget(item)}>Disable</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {modal && (
+            <div className="modal-overlay" onClick={() => setModal(null)}>
+              <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h2>{modal === 'add' ? 'New Special' : `Edit: ${modal.title}`}</h2>
+                  <button className="modal-close" onClick={() => setModal(null)}>×</button>
+                </div>
+                <div className="modal-body">
+                  <div className="form-group">
+                    <label>Title <span className="required">*</span></label>
+                    <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Weekend Brunch Special" />
+                  </div>
+                  <div className="form-group">
+                    <label>Description</label>
+                    <textarea rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe the special…" />
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Start Date</label>
+                      <input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
+                    </div>
+                    <div className="form-group">
+                      <label>End Date</label>
+                      <input type="date" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Image URL</label>
+                    <input type="text" value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} placeholder="https://… or /uploads/…" />
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>CTA Label</label>
+                      <input type="text" value={form.cta_label} onChange={e => setForm(f => ({ ...f, cta_label: e.target.value }))} placeholder="e.g. Order Now" />
+                    </div>
+                    <div className="form-group">
+                      <label>CTA URL</label>
+                      <input type="text" value={form.cta_url} onChange={e => setForm(f => ({ ...f, cta_url: e.target.value }))} placeholder="https://…" />
+                    </div>
+                  </div>
+                  <div className="toggle-row">
+                    <div>
+                      <div className="toggle-label">Active</div>
+                      <div className="toggle-hint">Show this special on the site</div>
+                    </div>
+                    <Toggle checked={form.is_active} onChange={v => setForm(f => ({ ...f, is_active: v }))} id="special-active" />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setModal(null)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={handleSave} disabled={saving || !form.title.trim()}>
+                    {saving ? 'Saving…' : (modal === 'add' ? 'Create' : 'Save')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {deleteTarget && (
+            <ConfirmDialog
+              title="Disable special?"
+              message={`"${deleteTarget.title}" will be deactivated.`}
+              confirmLabel="Disable"
+              confirmClass="btn-ghost"
+              onConfirm={() => handleDelete(deleteTarget)}
+              onCancel={() => setDeleteTarget(null)}
+            />
+          )}
+        </div>
       );
     }
 
     /* ── MENU ITEM FORM ── */
-    const CATEGORIES = ['breakfast','sandwiches-wraps-burgers','chicken-wings','lunch','sides-salads','other'];
-    const CATEGORY_LABELS = {
-      'breakfast': 'Breakfast',
-      'sandwiches-wraps-burgers': 'Sandwiches, Wraps & Burgers',
-      'chicken-wings': 'Chicken Wings',
-      'lunch': 'Lunch',
-      'sides-salads': 'Sides & Salads',
-      'other': 'Other'
-    };
-
-    function MenuItemForm({ item, onSave, onCancel, loading }) {
+    function MenuItemForm({ item, categories, onSave, onCancel, loading }) {
       const [name, setName] = useState(item?.name || '');
       const [description, setDescription] = useState(item?.description || '');
-      const [category, setCategory] = useState(item?.category || 'breakfast');
+      const [categoryId, setCategoryId] = useState(item?.categoryId || (categories[0]?.id || ''));
       const [priceMode, setPriceMode] = useState(item?.priceTiers?.length ? 'tiers' : 'single');
       const [price, setPrice] = useState(item?.price || '');
-      const [tiers, setTiers] = useState(
-        item?.priceTiers?.length ? item.priceTiers : [{ label: '', price: '' }]
-      );
+      const [tiers, setTiers] = useState(item?.priceTiers?.length ? item.priceTiers : [{ label: '', price: '' }]);
       const [seasonal, setSeasonal] = useState(item?.seasonal || false);
       const [available, setAvailable] = useState(item?.available !== false);
       const [imageFile, setImageFile] = useState(null);
@@ -301,31 +679,21 @@
 
       function addTier() { setTiers(prev => [...prev, { label: '', price: '' }]); }
       function removeTier(i) { setTiers(prev => prev.filter((_, idx) => idx !== i)); }
-      function updateTier(i, field, val) {
-        setTiers(prev => prev.map((t, idx) => idx === i ? { ...t, [field]: val } : t));
-      }
+      function updateTier(i, field, val) { setTiers(prev => prev.map((t, idx) => idx === i ? { ...t, [field]: val } : t)); }
 
       async function handleSubmit(e) {
         e.preventDefault();
         const fd = new FormData();
         fd.append('name', name);
         fd.append('description', description);
-        fd.append('category', category);
+        fd.append('categoryId', categoryId);
         fd.append('seasonal', seasonal);
         fd.append('available', available);
-        if (priceMode === 'single') {
-          fd.append('price', price);
-          fd.append('priceTiers', JSON.stringify([]));
-        } else {
-          fd.append('price', '');
-          fd.append('priceTiers', JSON.stringify(tiers.filter(t => t.label || t.price)));
-        }
+        if (priceMode === 'single') { fd.append('price', price); fd.append('priceTiers', JSON.stringify([])); }
+        else { fd.append('price', ''); fd.append('priceTiers', JSON.stringify(tiers.filter(t => t.label || t.price))); }
         fd.append('imageAlt', name);
-        if (imageFile) {
-          fd.append('image', imageFile);
-        } else {
-          fd.append('existingImage', item?.image || '');
-        }
+        if (imageFile) fd.append('image', imageFile);
+        else fd.append('existingImage', item?.image || '');
         await onSave(fd);
       }
 
@@ -336,49 +704,41 @@
               <label htmlFor="item-name">Name <span className="required">*</span></label>
               <input id="item-name" type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Breakfast Combo" />
             </div>
-
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="item-cat">Category</label>
-                <select id="item-cat" value={category} onChange={e => setCategory(e.target.value)}>
-                  {CATEGORIES.map(c => (
-                    <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>
+                <select id="item-cat" value={categoryId} onChange={e => setCategoryId(e.target.value)}>
+                  {categories.filter(c => c.is_active !== false).map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </div>
             </div>
-
             <div className="form-group">
               <label htmlFor="item-desc">Description</label>
-              <textarea id="item-desc" value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of the item" rows={2} />
+              <textarea id="item-desc" value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Brief description" />
             </div>
-
             <div className="form-group">
               <label>Pricing</label>
               <div className="price-mode">
-                <button type="button" className={`price-mode-btn${priceMode === 'single' ? ' active' : ''}`} onClick={() => setPriceMode('single')}>
-                  Single price
-                </button>
-                <button type="button" className={`price-mode-btn${priceMode === 'tiers' ? ' active' : ''}`} onClick={() => setPriceMode('tiers')}>
-                  Multiple sizes
-                </button>
+                <button type="button" className={`price-mode-btn${priceMode === 'single' ? ' active' : ''}`} onClick={() => setPriceMode('single')}>Single price</button>
+                <button type="button" className={`price-mode-btn${priceMode === 'tiers' ? ' active' : ''}`} onClick={() => setPriceMode('tiers')}>Multiple sizes</button>
               </div>
               {priceMode === 'single' ? (
-                <input type="text" value={price} onChange={e => setPrice(e.target.value)} placeholder="e.g. $9.00 or special" />
+                <input type="text" value={price} onChange={e => setPrice(e.target.value)} placeholder="e.g. $9.00 or market price" />
               ) : (
                 <div>
                   {tiers.map((tier, i) => (
                     <div key={i} className="price-tier-row">
                       <input type="text" value={tier.label} onChange={e => updateTier(i, 'label', e.target.value)} placeholder="Label (e.g. Small)" />
                       <input type="text" value={tier.price} onChange={e => updateTier(i, 'price', e.target.value)} placeholder="Price (e.g. 5.50)" />
-                      <button type="button" className="btn btn-ghost btn-icon" onClick={() => removeTier(i)} title="Remove tier" disabled={tiers.length === 1}>×</button>
+                      <button type="button" className="btn btn-ghost btn-icon" onClick={() => removeTier(i)} disabled={tiers.length === 1}>×</button>
                     </div>
                   ))}
                   <button type="button" className="btn btn-secondary btn-sm" onClick={addTier}>+ Add size</button>
                 </div>
               )}
             </div>
-
             <div className="form-group">
               <label>Image</label>
               <div
@@ -387,12 +747,8 @@
                 onDragLeave={() => setImageDrag(false)}
                 onDrop={e => { e.preventDefault(); setImageDrag(false); handleImageChange(e.dataTransfer.files[0]); }}
               >
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  onChange={e => handleImageChange(e.target.files[0])}
-                />
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={e => handleImageChange(e.target.files[0])} />
                 {imagePreview ? (
                   <div className="image-preview">
                     <img src={imagePreview} alt="Preview" />
@@ -407,25 +763,16 @@
                 )}
               </div>
             </div>
-
             <hr className="section-divider" />
-
             <div className="toggle-row">
-              <div>
-                <div className="toggle-label">Seasonal Item</div>
-                <div className="toggle-hint">Marks item as limited time / seasonal</div>
-              </div>
+              <div><div className="toggle-label">Seasonal Item</div><div className="toggle-hint">Mark as limited time</div></div>
               <Toggle checked={seasonal} onChange={setSeasonal} id="toggle-seasonal" />
             </div>
             <div className="toggle-row">
-              <div>
-                <div className="toggle-label">Available</div>
-                <div className="toggle-hint">Show this item on the public menu</div>
-              </div>
+              <div><div className="toggle-label">Available</div><div className="toggle-hint">Show on public menu</div></div>
               <Toggle checked={available} onChange={setAvailable} id="toggle-available" />
             </div>
           </div>
-
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
@@ -439,18 +786,21 @@
     /* ── MENU MANAGER ── */
     function MenuManager({ showToast }) {
       const [items, setItems] = useState([]);
+      const [categories, setCategories] = useState([]);
       const [loading, setLoading] = useState(true);
       const [saving, setSaving] = useState(false);
       const [search, setSearch] = useState('');
       const [filterCat, setFilterCat] = useState('all');
-      const [filterSeasonal, setFilterSeasonal] = useState('all');
-      const [modal, setModal] = useState(null); // null | 'add' | item object
+      const [modal, setModal] = useState(null);
       const [deleteTarget, setDeleteTarget] = useState(null);
 
       async function load() {
         setLoading(true);
-        try { setItems(await apiFetch('/api/menu')); }
-        catch (err) { showToast(err.message, 'error'); }
+        try {
+          const [menuData, catData] = await Promise.all([apiFetch('/api/menu'), apiFetch('/api/categories')]);
+          setItems(menuData);
+          setCategories(catData);
+        } catch (err) { showToast(err.message, 'error'); }
         finally { setLoading(false); }
       }
 
@@ -469,23 +819,17 @@
             showToast('Menu item updated');
           }
           setModal(null);
-        } catch (err) {
-          showToast(err.message, 'error');
-        } finally {
-          setSaving(false);
-        }
+        } catch (err) { showToast(err.message, 'error'); }
+        finally { setSaving(false); }
       }
 
       async function handleDelete(id) {
         try {
           await apiFetch(`/api/menu/${id}`, { method: 'DELETE' });
           setItems(prev => prev.filter(i => i.id !== id));
-          showToast('Item deleted');
-        } catch (err) {
-          showToast(err.message, 'error');
-        } finally {
-          setDeleteTarget(null);
-        }
+          showToast('Item removed');
+        } catch (err) { showToast(err.message, 'error'); }
+        finally { setDeleteTarget(null); }
       }
 
       async function toggleAvailable(item) {
@@ -494,70 +838,42 @@
           Object.entries(item).forEach(([k, v]) => {
             if (k === 'available') fd.append(k, !item.available);
             else if (k === 'priceTiers') fd.append(k, JSON.stringify(v));
-            else if (k !== 'image') fd.append(k, v);
+            else if (k === 'categoryId') fd.append(k, v);
+            else if (k !== 'image') fd.append(k, v ?? '');
           });
           fd.append('existingImage', item.image || '');
           const updated = await apiFormFetch(`/api/menu/${item.id}`, { method: 'PUT', body: fd });
           setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
-          showToast(updated.available ? 'Item is now visible' : 'Item hidden from menu');
-        } catch (err) {
-          showToast(err.message, 'error');
-        }
+          showToast(updated.available ? 'Item visible' : 'Item hidden');
+        } catch (err) { showToast(err.message, 'error'); }
       }
 
       const filtered = sortMenuItemsForDisplay(items.filter(item => {
         const matchSearch = !search || item.name.toLowerCase().includes(search.toLowerCase());
         const matchCat = filterCat === 'all' || item.category === filterCat;
-        const matchSeasonal = filterSeasonal === 'all' || (filterSeasonal === 'yes' ? item.seasonal : !item.seasonal);
-        return matchSearch && matchCat && matchSeasonal;
+        return matchSearch && matchCat;
       }));
 
-      const stats = {
-        total: items.length,
-        available: items.filter(i => i.available).length,
-        seasonal: items.filter(i => i.seasonal).length,
-      };
+      const stats = { total: items.length, available: items.filter(i => i.available).length, seasonal: items.filter(i => i.seasonal).length };
 
       return (
         <div>
           <div className="stats-row">
-            <div className="stat-card">
-              <div className="stat-value">{stats.total}</div>
-              <div className="stat-label">Total Items</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value" style={{ color: 'var(--green)' }}>{stats.available}</div>
-              <div className="stat-label">Available</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value" style={{ color: 'var(--yellow)' }}>{stats.seasonal}</div>
-              <div className="stat-label">Seasonal</div>
-            </div>
+            <div className="stat-card"><div className="stat-value">{stats.total}</div><div className="stat-label">Total Items</div></div>
+            <div className="stat-card"><div className="stat-value" style={{ color: 'var(--green)' }}>{stats.available}</div><div className="stat-label">Available</div></div>
+            <div className="stat-card"><div className="stat-value" style={{ color: 'var(--yellow)' }}>{stats.seasonal}</div><div className="stat-label">Seasonal</div></div>
           </div>
 
           <div className="toolbar">
             <div className="toolbar-left">
-              <input
-                className="search-input"
-                type="search"
-                placeholder="Search items…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+              <input className="search-input" type="search" placeholder="Search items…" value={search} onChange={e => setSearch(e.target.value)} />
               <select className="filter-select" value={filterCat} onChange={e => setFilterCat(e.target.value)}>
                 <option value="all">All categories</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>)}
-              </select>
-              <select className="filter-select" value={filterSeasonal} onChange={e => setFilterSeasonal(e.target.value)}>
-                <option value="all">All items</option>
-                <option value="yes">Seasonal only</option>
-                <option value="no">Regular only</option>
+                {categories.filter(c => c.is_active !== false).map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
               </select>
             </div>
             <div className="toolbar-right">
-              <button className="btn btn-primary" onClick={() => setModal('add')}>
-                + Add Item
-              </button>
+              <button className="btn btn-primary" onClick={() => setModal('add')}>+ Add Item</button>
             </div>
           </div>
 
@@ -567,24 +883,21 @@
             <div className="empty-state">
               <div className="empty-state-icon">🍽</div>
               <h3>{items.length === 0 ? 'No menu items yet' : 'No items match your filters'}</h3>
-              <p>{items.length === 0 ? 'Add your first menu item to get started.' : 'Try clearing your search or filters.'}</p>
+              <p>{items.length === 0 ? 'Add your first menu item.' : 'Try clearing your search or filters.'}</p>
               {items.length === 0 && <button className="btn btn-primary" onClick={() => setModal('add')}>Add First Item</button>}
             </div>
           ) : (
             <div className="menu-grid">
               {filtered.map(item => (
                 <div key={item.id} className="menu-card" style={{ opacity: item.available ? 1 : 0.6 }}>
-                  <img
-                    className={`menu-card-image${item.image ? '' : ' menu-card-image-fallback'}`}
+                  <img className={`menu-card-image${item.image ? '' : ' menu-card-image-fallback'}`}
                     src={item.image ? assetUrl(item.image) : MENU_IMAGE_FALLBACK}
-                    alt={item.imageAlt || item.name || 'Photo Unavailable'}
-                    loading="lazy"
-                  />
+                    alt={item.imageAlt || item.name} loading="lazy" />
                   <div className="menu-card-body">
                     <div className="menu-card-name">{item.name}</div>
                     {item.description && <div className="menu-card-desc">{item.description}</div>}
                     <div className="menu-card-meta">
-                      <span className="badge badge-gray">{item.category}</span>
+                      <span className="badge badge-gray">{item.categoryName || item.category}</span>
                       {item.seasonal && <span className="badge badge-yellow">Seasonal</span>}
                       {!item.available && <span className="badge badge-red">Hidden</span>}
                     </div>
@@ -593,15 +906,11 @@
                     <div>
                       <div className="menu-card-price">{formatPrice(item)}</div>
                       {item.priceTiers?.length > 0 && (
-                        <div className="menu-card-price-tiers">
-                          {item.priceTiers.map(t => `${t.label} $${t.price}`).join(' · ')}
-                        </div>
+                        <div className="menu-card-price-tiers">{item.priceTiers.map(t => `${t.label} $${t.price}`).join(' · ')}</div>
                       )}
                     </div>
                     <div className="menu-card-actions">
-                      <button className="btn btn-ghost btn-icon btn-sm" title={item.available ? 'Hide' : 'Show'} onClick={() => toggleAvailable(item)}>
-                        {item.available ? '👁' : '🚫'}
-                      </button>
+                      <button className="btn btn-ghost btn-icon btn-sm" title={item.available ? 'Hide' : 'Show'} onClick={() => toggleAvailable(item)}>{item.available ? '👁' : '🚫'}</button>
                       <button className="btn btn-secondary btn-icon btn-sm" title="Edit" onClick={() => setModal(item)}>✏️</button>
                       <button className="btn btn-danger btn-icon btn-sm" title="Delete" onClick={() => setDeleteTarget(item)}>🗑</button>
                     </div>
@@ -618,23 +927,14 @@
                   <h2>{modal === 'add' ? 'Add Menu Item' : `Edit: ${modal.name}`}</h2>
                   <button className="modal-close" onClick={() => setModal(null)}>×</button>
                 </div>
-                <MenuItemForm
-                  item={modal === 'add' ? null : modal}
-                  onSave={handleSave}
-                  onCancel={() => setModal(null)}
-                  loading={saving}
-                />
+                <MenuItemForm item={modal === 'add' ? null : modal} categories={categories} onSave={handleSave} onCancel={() => setModal(null)} loading={saving} />
               </div>
             </div>
           )}
 
           {deleteTarget && (
-            <ConfirmDialog
-              title="Delete menu item?"
-              message={`"${deleteTarget.name}" will be permanently removed.`}
-              onConfirm={() => handleDelete(deleteTarget.id)}
-              onCancel={() => setDeleteTarget(null)}
-            />
+            <ConfirmDialog title="Delete menu item?" message={`"${deleteTarget.name}" will be permanently removed.`}
+              onConfirm={() => handleDelete(deleteTarget.id)} onCancel={() => setDeleteTarget(null)} />
           )}
         </div>
       );
@@ -664,19 +964,13 @@
 
       function handleFileSelect(file) {
         if (!file) return;
-        setPendingFile(file);
-        setPendingCaption('');
+        setPendingFile(file); setPendingCaption('');
         const reader = new FileReader();
         reader.onload = e => setPendingPreview(e.target.result);
         reader.readAsDataURL(file);
       }
 
-      function cancelUpload() {
-        setPendingFile(null);
-        setPendingPreview('');
-        setPendingCaption('');
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
+      function cancelUpload() { setPendingFile(null); setPendingPreview(''); setPendingCaption(''); if (fileInputRef.current) fileInputRef.current.value = ''; }
 
       async function handleUpload(e) {
         e.preventDefault();
@@ -690,56 +984,34 @@
           setItems(prev => [...prev, created]);
           showToast('Photo uploaded');
           cancelUpload();
-        } catch (err) {
-          showToast(err.message, 'error');
-        } finally {
-          setUploading(false);
-        }
+        } catch (err) { showToast(err.message, 'error'); }
+        finally { setUploading(false); }
       }
 
       async function handleDelete(id) {
-        try {
-          await apiFetch(`/api/gallery/${id}`, { method: 'DELETE' });
-          setItems(prev => prev.filter(i => i.id !== id));
-          showToast('Photo deleted');
-        } catch (err) {
-          showToast(err.message, 'error');
-        } finally {
-          setDeleteTarget(null);
-        }
+        try { await apiFetch(`/api/gallery/${id}`, { method: 'DELETE' }); setItems(prev => prev.filter(i => i.id !== id)); showToast('Photo deleted'); }
+        catch (err) { showToast(err.message, 'error'); }
+        finally { setDeleteTarget(null); }
       }
 
       async function saveCaption(item) {
         const caption = captionEdits[item.id] ?? item.caption;
         try {
-          const updated = await apiFetch(`/api/gallery/${item.id}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ caption }),
-          });
+          const updated = await apiFetch(`/api/gallery/${item.id}`, { method: 'PATCH', body: JSON.stringify({ caption }) });
           setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
-          setCaptionEdits(prev => { const n = {...prev}; delete n[item.id]; return n; });
+          setCaptionEdits(prev => { const n = { ...prev }; delete n[item.id]; return n; });
           showToast('Caption saved');
-        } catch (err) {
-          showToast(err.message, 'error');
-        }
+        } catch (err) { showToast(err.message, 'error'); }
       }
 
       return (
         <div>
-          {/* Upload zone */}
           {!pendingFile ? (
-            <div
-              className={`upload-zone${dragOver ? ' drag-over' : ''}`}
+            <div className={`upload-zone${dragOver ? ' drag-over' : ''}`}
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
-              onDrop={e => { e.preventDefault(); setDragOver(false); handleFileSelect(e.dataTransfer.files[0]); }}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                onChange={e => handleFileSelect(e.target.files[0])}
-              />
+              onDrop={e => { e.preventDefault(); setDragOver(false); handleFileSelect(e.dataTransfer.files[0]); }}>
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={e => handleFileSelect(e.target.files[0])} />
               <div className="upload-zone-icon">📷</div>
               <h3>Click or drag a photo here</h3>
               <p>JPG, PNG, WebP up to 10 MB</p>
@@ -748,39 +1020,23 @@
             <form className="upload-form" onSubmit={handleUpload}>
               <img src={pendingPreview} alt="Upload preview" className="upload-form-preview" />
               <div className="form-group">
-                <label htmlFor="upload-caption">Caption</label>
-                <input
-                  id="upload-caption"
-                  type="text"
-                  value={pendingCaption}
-                  onChange={e => setPendingCaption(e.target.value)}
-                  placeholder="Describe this photo (optional)"
-                  autoFocus
-                />
+                <label>Caption</label>
+                <input type="text" value={pendingCaption} onChange={e => setPendingCaption(e.target.value)} placeholder="Describe this photo (optional)" autoFocus />
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="button" className="btn btn-secondary" onClick={cancelUpload}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={uploading}>
-                  {uploading ? 'Uploading…' : 'Upload Photo'}
-                </button>
+                <button type="submit" className="btn btn-primary" disabled={uploading}>{uploading ? 'Uploading…' : 'Upload Photo'}</button>
               </div>
             </form>
           )}
 
-          {/* Gallery grid */}
           {loading ? (
             <div className="loading-state"><div className="spinner"></div><span>Loading gallery…</span></div>
           ) : items.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon">📷</div>
-              <h3>No photos yet</h3>
-              <p>Upload your first photo using the area above.</p>
-            </div>
+            <div className="empty-state"><div className="empty-state-icon">📷</div><h3>No photos yet</h3><p>Upload your first photo above.</p></div>
           ) : (
             <div>
-              <div style={{ marginBottom: 14, fontWeight: 600, fontSize: 13, color: 'var(--muted)' }}>
-                {items.length} photo{items.length !== 1 ? 's' : ''}
-              </div>
+              <div style={{ marginBottom: 14, fontWeight: 600, fontSize: 13, color: 'var(--muted)' }}>{items.length} photo{items.length !== 1 ? 's' : ''}</div>
               <div className="gallery-grid-admin">
                 {items.map(item => {
                   const editCaption = captionEdits[item.id] ?? item.caption;
@@ -789,21 +1045,12 @@
                     <div key={item.id} className="gallery-card-admin">
                       <img className="gallery-card-image" src={assetUrl(item.src)} alt={item.caption || 'Gallery photo'} loading="lazy" />
                       <div className="gallery-card-body">
-                        <textarea
-                          className="gallery-caption-input"
-                          rows={2}
-                          value={editCaption}
-                          placeholder="Add a caption…"
+                        <textarea className="gallery-caption-input" rows={2} value={editCaption} placeholder="Add a caption…"
                           onChange={e => setCaptionEdits(prev => ({ ...prev, [item.id]: e.target.value }))}
-                          onBlur={() => { if (isDirty) saveCaption(item); }}
-                        />
+                          onBlur={() => { if (isDirty) saveCaption(item); }} />
                       </div>
                       <div className="gallery-card-footer">
-                        {isDirty && (
-                          <button className="btn btn-secondary btn-sm" style={{ marginRight: 'auto' }} onClick={() => saveCaption(item)}>
-                            Save
-                          </button>
-                        )}
+                        {isDirty && <button className="btn btn-secondary btn-sm" style={{ marginRight: 'auto' }} onClick={() => saveCaption(item)}>Save</button>}
                         <button className="btn btn-danger btn-sm" onClick={() => setDeleteTarget(item)}>Delete</button>
                       </div>
                     </div>
@@ -814,57 +1061,539 @@
           )}
 
           {deleteTarget && (
-            <ConfirmDialog
-              title="Delete photo?"
-              message="This photo will be permanently removed from the gallery."
-              onConfirm={() => handleDelete(deleteTarget.id)}
-              onCancel={() => setDeleteTarget(null)}
-            />
+            <ConfirmDialog title="Delete photo?" message="This photo will be permanently removed."
+              onConfirm={() => handleDelete(deleteTarget.id)} onCancel={() => setDeleteTarget(null)} />
           )}
         </div>
       );
     }
 
-    /* ── DASHBOARD ── */
-    function Dashboard({ onLogout }) {
-      const initialPage = window.location.hash.replace('#', '') === 'gallery' ? 'gallery' : 'menu';
-      const [page, setPage] = useState(initialPage);
+    /* ── SETTINGS PAGE ── */
+    function SettingsPage({ showToast }) {
+      const [form, setForm] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [saving, setSaving] = useState(false);
+      const [heroUploading, setHeroUploading] = useState(false);
+      const heroFileRef = useRef();
+
+      useEffect(() => {
+        apiFetch('/api/settings')
+          .then(data => {
+            setForm({
+              site_name: data.site_name || 'Bits & Bytes Cafe',
+              tagline: data.tagline || '',
+              primary_phone: data.primary_phone || '',
+              secondary_phone: data.secondary_phone || '',
+              whatsapp: data.whatsapp || '',
+              email: data.email || '',
+              address_line1: data.address_line1 || '',
+              address_city: data.address_city || '',
+              google_maps_url: data.google_maps_url || '',
+              hero_heading: data.hero_heading || '',
+              hero_heading_span: data.hero_heading_span || '',
+              hero_subheading: data.hero_subheading || '',
+              hero_image_url: data.hero_image_url || '',
+              facebook_url: data.facebook_url || '',
+              instagram_url: data.instagram_url || '',
+              tiktok_url: data.tiktok_url || '',
+              whatsapp_url: data.whatsapp_url || '',
+              opening_hours: data.opening_hours || [
+                { day: 'Monday', open: '07:00', close: '16:00', closed: false },
+                { day: 'Tuesday', open: '07:00', close: '16:00', closed: false },
+                { day: 'Wednesday', open: '07:00', close: '16:00', closed: false },
+                { day: 'Thursday', open: '07:00', close: '16:00', closed: false },
+                { day: 'Friday', open: '07:00', close: '16:00', closed: false },
+                { day: 'Saturday', open: '07:00', close: '16:00', closed: false },
+                { day: 'Sunday', open: '', close: '', closed: true },
+              ]
+            });
+          })
+          .catch(err => showToast(err.message, 'error'))
+          .finally(() => setLoading(false));
+      }, []);
+
+      function setField(key, value) { setForm(f => ({ ...f, [key]: value })); }
+      function setHour(i, field, value) {
+        setForm(f => {
+          const hours = [...f.opening_hours];
+          hours[i] = { ...hours[i], [field]: value };
+          return { ...f, opening_hours: hours };
+        });
+      }
+
+      async function handleSave() {
+        setSaving(true);
+        try {
+          await apiFetch('/api/settings', { method: 'PUT', body: JSON.stringify(form) });
+          showToast('Settings saved');
+        } catch (err) { showToast(err.message, 'error'); }
+        finally { setSaving(false); }
+      }
+
+      async function handleHeroUpload(file) {
+        if (!file) return;
+        setHeroUploading(true);
+        try {
+          const fd = new FormData();
+          fd.append('image', file);
+          const result = await apiFormFetch('/api/settings/hero-image', { method: 'POST', body: fd });
+          setField('hero_image_url', result.image);
+          showToast('Hero image uploaded');
+        } catch (err) { showToast(err.message, 'error'); }
+        finally { setHeroUploading(false); }
+      }
+
+      if (loading || !form) return <div className="loading-state"><div className="spinner"></div><span>Loading settings…</span></div>;
+
+      return (
+        <div className="settings-page">
+          <div className="settings-section">
+            <h3 className="settings-section-title">Business Information</h3>
+            <div className="form-row">
+              <div className="form-group"><label>Business Name</label><input type="text" value={form.site_name} onChange={e => setField('site_name', e.target.value)} /></div>
+              <div className="form-group"><label>Tagline</label><input type="text" value={form.tagline} onChange={e => setField('tagline', e.target.value)} /></div>
+            </div>
+          </div>
+
+          <div className="settings-section">
+            <h3 className="settings-section-title">Contact Details</h3>
+            <div className="form-row">
+              <div className="form-group"><label>Phone</label><input type="text" value={form.primary_phone} onChange={e => setField('primary_phone', e.target.value)} placeholder="(242) 603-2487" /></div>
+              <div className="form-group"><label>Secondary Phone</label><input type="text" value={form.secondary_phone} onChange={e => setField('secondary_phone', e.target.value)} /></div>
+            </div>
+            <div className="form-row">
+              <div className="form-group"><label>WhatsApp</label><input type="text" value={form.whatsapp} onChange={e => setField('whatsapp', e.target.value)} placeholder="(242) 825-2983" /></div>
+              <div className="form-group"><label>Email</label><input type="email" value={form.email} onChange={e => setField('email', e.target.value)} /></div>
+            </div>
+            <div className="form-row">
+              <div className="form-group"><label>Address</label><input type="text" value={form.address_line1} onChange={e => setField('address_line1', e.target.value)} placeholder="Shirley Street" /></div>
+              <div className="form-group"><label>City</label><input type="text" value={form.address_city} onChange={e => setField('address_city', e.target.value)} placeholder="Nassau, Bahamas" /></div>
+            </div>
+            <div className="form-group"><label>Google Maps URL</label><input type="url" value={form.google_maps_url} onChange={e => setField('google_maps_url', e.target.value)} placeholder="https://maps.google.com/…" /></div>
+          </div>
+
+          <div className="settings-section">
+            <h3 className="settings-section-title">Opening Hours</h3>
+            <div className="hours-table">
+              {form.opening_hours.map((h, i) => (
+                <div key={h.day} className="hours-row">
+                  <div className="hours-day">{h.day}</div>
+                  <Toggle checked={!h.closed} onChange={v => setHour(i, 'closed', !v)} id={`hours-${i}`} />
+                  {!h.closed ? (
+                    <div className="hours-times">
+                      <input type="time" value={h.open} onChange={e => setHour(i, 'open', e.target.value)} />
+                      <span>–</span>
+                      <input type="time" value={h.close} onChange={e => setHour(i, 'close', e.target.value)} />
+                    </div>
+                  ) : (
+                    <div className="hours-closed-label">Closed</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="settings-section">
+            <h3 className="settings-section-title">Hero Section</h3>
+            <div className="form-row">
+              <div className="form-group"><label>Heading</label><input type="text" value={form.hero_heading} onChange={e => setField('hero_heading', e.target.value)} placeholder="Fresh bites." /></div>
+              <div className="form-group"><label>Heading Highlight</label><input type="text" value={form.hero_heading_span} onChange={e => setField('hero_heading_span', e.target.value)} placeholder="Friendly bytes." /></div>
+            </div>
+            <div className="form-group"><label>Subheading</label><textarea rows={2} value={form.hero_subheading} onChange={e => setField('hero_subheading', e.target.value)} /></div>
+            <div className="form-group">
+              <label>Hero Image</label>
+              <div className="hero-image-upload">
+                {form.hero_image_url && <img src={assetUrl(form.hero_image_url)} alt="Hero" className="hero-image-preview" />}
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => heroFileRef.current?.click()} disabled={heroUploading}>
+                  {heroUploading ? 'Uploading…' : 'Upload New Hero Image'}
+                </button>
+                <input ref={heroFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleHeroUpload(e.target.files[0])} />
+              </div>
+            </div>
+          </div>
+
+          <div className="settings-section">
+            <h3 className="settings-section-title">Social Media</h3>
+            <div className="form-row">
+              <div className="form-group"><label>Facebook URL</label><input type="url" value={form.facebook_url} onChange={e => setField('facebook_url', e.target.value)} placeholder="https://facebook.com/…" /></div>
+              <div className="form-group"><label>Instagram URL</label><input type="url" value={form.instagram_url} onChange={e => setField('instagram_url', e.target.value)} placeholder="https://instagram.com/…" /></div>
+            </div>
+            <div className="form-row">
+              <div className="form-group"><label>TikTok URL</label><input type="url" value={form.tiktok_url} onChange={e => setField('tiktok_url', e.target.value)} placeholder="https://tiktok.com/…" /></div>
+              <div className="form-group"><label>WhatsApp URL</label><input type="url" value={form.whatsapp_url} onChange={e => setField('whatsapp_url', e.target.value)} placeholder="https://wa.me/…" /></div>
+            </div>
+          </div>
+
+          <div className="settings-save-bar">
+            <button className="btn btn-primary btn-lg" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save Settings'}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    /* ── CONTENT PAGE ── */
+    function ContentPage({ showToast }) {
+      const [sections, setSections] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [editing, setEditing] = useState(null);
+      const [form, setForm] = useState({});
+      const [saving, setSaving] = useState(false);
+
+      useEffect(() => {
+        apiFetch('/api/sections')
+          .then(data => {
+            if (!data.length) {
+              setSections([
+                { section_key: 'hero', title: 'Hero Section', subtitle: '', body: '', is_active: true },
+                { section_key: 'about', title: 'About Us', subtitle: '', body: '', is_active: true },
+                { section_key: 'menu_featured', title: 'Featured Menu', subtitle: '', body: '', is_active: true },
+                { section_key: 'gallery', title: 'Gallery', subtitle: '', body: '', is_active: true },
+              ]);
+            } else {
+              setSections(data);
+            }
+          })
+          .catch(err => showToast(err.message, 'error'))
+          .finally(() => setLoading(false));
+      }, []);
+
+      function openEdit(section) {
+        setForm({ title: section.title || '', subtitle: section.subtitle || '', body: section.body || '', button_label: section.button_label || '', button_url: section.button_url || '', is_active: section.is_active !== false });
+        setEditing(section);
+      }
+
+      async function handleSave() {
+        setSaving(true);
+        try {
+          const updated = await apiFetch(`/api/sections/${editing.section_key}`, { method: 'PUT', body: JSON.stringify(form) });
+          setSections(prev => prev.map(s => s.section_key === editing.section_key ? updated : s));
+          showToast('Section saved');
+          setEditing(null);
+        } catch (err) { showToast(err.message, 'error'); }
+        finally { setSaving(false); }
+      }
+
+      if (loading) return <div className="loading-state"><div className="spinner"></div><span>Loading…</span></div>;
+
+      return (
+        <div>
+          <div className="sections-list">
+            {sections.map(section => (
+              <div key={section.section_key} className="section-item">
+                <div className="section-item-body">
+                  <div className="section-item-title">{section.title || section.section_key}</div>
+                  <div className="section-item-key"><code>{section.section_key}</code></div>
+                  {section.subtitle && <div className="section-item-sub">{section.subtitle}</div>}
+                </div>
+                <div className="section-item-actions">
+                  <span className={`badge ${section.is_active !== false ? 'badge-green' : 'badge-gray'}`}>{section.is_active !== false ? 'Active' : 'Hidden'}</span>
+                  <button className="btn btn-secondary btn-sm" onClick={() => openEdit(section)}>Edit</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {editing && (
+            <div className="modal-overlay" onClick={() => setEditing(null)}>
+              <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h2>Edit: {editing.title || editing.section_key}</h2>
+                  <button className="modal-close" onClick={() => setEditing(null)}>×</button>
+                </div>
+                <div className="modal-body">
+                  <div className="form-group"><label>Title</label><input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
+                  <div className="form-group"><label>Subtitle</label><input type="text" value={form.subtitle} onChange={e => setForm(f => ({ ...f, subtitle: e.target.value }))} /></div>
+                  <div className="form-group"><label>Body Text</label><textarea rows={5} value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} /></div>
+                  <div className="form-row">
+                    <div className="form-group"><label>Button Label</label><input type="text" value={form.button_label} onChange={e => setForm(f => ({ ...f, button_label: e.target.value }))} /></div>
+                    <div className="form-group"><label>Button URL</label><input type="text" value={form.button_url} onChange={e => setForm(f => ({ ...f, button_url: e.target.value }))} /></div>
+                  </div>
+                  <div className="toggle-row">
+                    <div><div className="toggle-label">Active</div><div className="toggle-hint">Show this section on the public site</div></div>
+                    <Toggle checked={form.is_active} onChange={v => setForm(f => ({ ...f, is_active: v }))} id="section-active" />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setEditing(null)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    /* ── ANALYTICS PAGE ── */
+    function AnalyticsPage({ showToast }) {
+      const [data, setData] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [range, setRange] = useState('7d');
+
+      function load(r) {
+        setLoading(true);
+        apiFetch(`/api/analytics?range=${r}`)
+          .then(setData)
+          .catch(err => showToast(err.message, 'error'))
+          .finally(() => setLoading(false));
+      }
+
+      useEffect(() => { load(range); }, [range]);
+
+      const maxCount = data?.trafficByDay?.length ? Math.max(...data.trafficByDay.map(d => d.count), 1) : 1;
+
+      return (
+        <div className="analytics-page">
+          <div className="toolbar">
+            <div className="toolbar-left">
+              {[['today', 'Today'], ['7d', 'Last 7 days'], ['30d', 'Last 30 days'], ['all', 'All time']].map(([val, label]) => (
+                <button key={val} className={`btn ${range === val ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setRange(val)}>{label}</button>
+              ))}
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="loading-state"><div className="spinner"></div><span>Loading analytics…</span></div>
+          ) : !data ? null : (
+            <>
+              <div className="stats-row">
+                <div className="stat-card"><div className="stat-value">{data.totalPageViews}</div><div className="stat-label">Page Views</div></div>
+                <div className="stat-card"><div className="stat-value">{data.uniqueVisitors}</div><div className="stat-label">Unique Visitors</div></div>
+                <div className="stat-card"><div className="stat-value">{data.totalShares}</div><div className="stat-label">Social Shares</div></div>
+                <div className="stat-card">
+                  <div className="stat-value" style={{ fontSize: 16 }}>
+                    <span style={{ color: '#1877f2' }}>FB {data.fbShares}</span>
+                    <span style={{ margin: '0 6px', color: 'var(--border)' }}>|</span>
+                    <span style={{ color: '#25d366' }}>WA {data.waShares}</span>
+                  </div>
+                  <div className="stat-label">Share Breakdown</div>
+                </div>
+              </div>
+
+              {data.trafficByDay?.length > 0 && (
+                <div className="chart-card">
+                  <div className="chart-title">Daily Page Views</div>
+                  <div className="bar-chart">
+                    {data.trafficByDay.map(d => (
+                      <div key={d.date} className="bar-col">
+                        <div className="bar-value">{d.count}</div>
+                        <div className="bar-fill" style={{ height: `${Math.max(4, (d.count / maxCount) * 120)}px` }}></div>
+                        <div className="bar-label">{dayLabel(d.date)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {data.topPages?.length > 0 && (
+                <div className="table-card">
+                  <div style={{ padding: '16px 20px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Top Pages</div>
+                  <table className="data-table">
+                    <thead><tr><th>Page</th><th style={{ textAlign: 'right' }}>Views</th></tr></thead>
+                    <tbody>
+                      {data.topPages.map(p => (
+                        <tr key={p.path}><td><code className="code-badge">{p.path}</code></td><td style={{ textAlign: 'right' }}>{p.count}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
+
+    /* ── USERS PAGE ── */
+    function UsersPage({ showToast }) {
+      const [users, setUsers] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [modal, setModal] = useState(null);
+      const [saving, setSaving] = useState(false);
+      const emptyForm = { first_name: '', last_name: '', email: '', role: 'staff', status: 'active', notes: '' };
+      const [form, setForm] = useState(emptyForm);
+
+      async function load() {
+        setLoading(true);
+        try { setUsers(await apiFetch('/api/users')); }
+        catch (err) { showToast(err.message, 'error'); }
+        finally { setLoading(false); }
+      }
+
+      useEffect(() => { load(); }, []);
+
+      function openAdd() { setForm(emptyForm); setModal('add'); }
+      function openEdit(u) { setForm({ first_name: u.first_name || '', last_name: u.last_name || '', email: u.email || '', role: u.role || 'staff', status: u.status || 'active', notes: u.notes || '' }); setModal(u); }
+
+      async function handleSave() {
+        setSaving(true);
+        try {
+          if (modal === 'add') {
+            const created = await apiFetch('/api/users', { method: 'POST', body: JSON.stringify(form) });
+            setUsers(prev => [...prev, created]);
+            showToast('User added');
+          } else {
+            const updated = await apiFetch(`/api/users/${modal.id}`, { method: 'PUT', body: JSON.stringify(form) });
+            setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+            showToast('User updated');
+          }
+          setModal(null);
+        } catch (err) { showToast(err.message, 'error'); }
+        finally { setSaving(false); }
+      }
+
+      async function disableUser(u) {
+        try {
+          await apiFetch(`/api/users/${u.id}`, { method: 'DELETE' });
+          setUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: 'disabled' } : x));
+          showToast('User disabled');
+        } catch (err) { showToast(err.message, 'error'); }
+      }
+
+      const roleColors = { admin: 'badge-red', manager: 'badge-yellow', staff: 'badge-gray' };
+      const statusColors = { active: 'badge-green', disabled: 'badge-gray', pending: 'badge-yellow' };
+
+      return (
+        <div>
+          <div className="toolbar">
+            <div className="toolbar-left" />
+            <div className="toolbar-right">
+              <button className="btn btn-primary" onClick={openAdd}>+ Add User</button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="loading-state"><div className="spinner"></div><span>Loading…</span></div>
+          ) : (
+            <div className="table-card">
+              <table className="data-table">
+                <thead>
+                  <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th style={{ textAlign: 'right' }}>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {users.length === 0 ? (
+                    <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: 32 }}>No users yet.</td></tr>
+                  ) : users.map(u => (
+                    <tr key={u.id}>
+                      <td style={{ fontWeight: 600 }}>{`${u.first_name} ${u.last_name}`.trim() || '—'}</td>
+                      <td>{u.email}</td>
+                      <td><span className={`badge ${roleColors[u.role] || 'badge-gray'}`}>{u.role}</span></td>
+                      <td><span className={`badge ${statusColors[u.status] || 'badge-gray'}`}>{u.status}</span></td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => openEdit(u)}>Edit</button>
+                        {u.status !== 'disabled' && (
+                          <button className="btn btn-ghost btn-sm" style={{ marginLeft: 6 }} onClick={() => disableUser(u)}>Disable</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {modal && (
+            <div className="modal-overlay" onClick={() => setModal(null)}>
+              <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h2>{modal === 'add' ? 'Add User' : `Edit: ${modal.email}`}</h2>
+                  <button className="modal-close" onClick={() => setModal(null)}>×</button>
+                </div>
+                <div className="modal-body">
+                  <div className="form-row">
+                    <div className="form-group"><label>First Name</label><input type="text" value={form.first_name} onChange={e => setForm(f => ({ ...f, first_name: e.target.value }))} /></div>
+                    <div className="form-group"><label>Last Name</label><input type="text" value={form.last_name} onChange={e => setForm(f => ({ ...f, last_name: e.target.value }))} /></div>
+                  </div>
+                  <div className="form-group"><label>Email <span className="required">*</span></label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Role</label>
+                      <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+                        <option value="admin">Admin</option>
+                        <option value="manager">Manager</option>
+                        <option value="staff">Staff</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Status</label>
+                      <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                        <option value="active">Active</option>
+                        <option value="pending">Pending</option>
+                        <option value="disabled">Disabled</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-group"><label>Notes</label><textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes…" /></div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setModal(null)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={handleSave} disabled={saving || !form.email.trim()}>
+                    {saving ? 'Saving…' : (modal === 'add' ? 'Add User' : 'Save')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    /* ── PAGE TITLES ── */
+    const PAGE_INFO = {
+      dashboard:  { title: 'Dashboard',           sub: 'Overview of your restaurant content' },
+      menu:       { title: 'Menu Manager',         sub: 'Add, edit and manage menu items' },
+      categories: { title: 'Categories',           sub: 'Manage menu categories' },
+      specials:   { title: 'Specials',             sub: 'Create promotional specials' },
+      gallery:    { title: 'Photo Gallery',        sub: 'Manage photos shown in the gallery section' },
+      content:    { title: 'Website Content',      sub: 'Edit page sections and text' },
+      settings:   { title: 'Business Settings',    sub: 'Hours, contact info, hero text and social links' },
+      analytics:  { title: 'Analytics',            sub: 'Traffic, page views and social share data' },
+      users:      { title: 'Users',                sub: 'Manage admin panel users and roles' },
+    };
+
+    /* ── MAIN SHELL ── */
+    function Shell() {
+      const hash = window.location.hash.replace('#', '');
+      const validPages = Object.keys(PAGE_INFO);
+      const [page, setPage] = useState(validPages.includes(hash) ? hash : 'dashboard');
+      const [mobileOpen, setMobileOpen] = useState(false);
       const { toasts, show: showToast } = useToast();
 
       useEffect(() => {
-        function handleHashChange() {
-          setPage(window.location.hash.replace('#', '') === 'gallery' ? 'gallery' : 'menu');
-        }
-        window.addEventListener('hashchange', handleHashChange);
-        return () => window.removeEventListener('hashchange', handleHashChange);
-      }, []);
+        window.location.hash = page;
+      }, [page]);
 
-      function handleLogout() {
-        clearStoredToken();
-        window.location.replace('/admin/login');
-      }
+      function handleLogout() { clearStoredToken(); window.location.replace('/admin/login'); }
 
-      const pageInfo = {
-        menu: { title: 'Menu Manager', sub: 'Manage items shown in the Popular Bytes section' },
-        gallery: { title: 'Photo Gallery', sub: 'Manage photos shown in the Fresh from the Cafe section' },
-      };
+      const info = PAGE_INFO[page] || PAGE_INFO.dashboard;
 
       return (
         <div className="dashboard">
-          <Sidebar page={page} setPage={setPage} onLogout={handleLogout} />
+          <Sidebar page={page} setPage={setPage} onLogout={handleLogout} mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
           <div className="main-content">
             <div className="content-header">
-              <div>
-                <h1>{pageInfo[page].title}</h1>
-                <p>{pageInfo[page].sub}</p>
+              <div className="content-header-left">
+                <button className="mobile-menu-btn" onClick={() => setMobileOpen(o => !o)} aria-label="Open menu">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <div>
+                  <h1>{info.title}</h1>
+                  <p>{info.sub}</p>
+                </div>
               </div>
-              <a href="/" target="_blank" rel="noopener" className="btn btn-secondary btn-sm">
-                View Live Site ↗
-              </a>
             </div>
             <div className="content-body">
-              {page === 'menu' && <MenuManager showToast={showToast} />}
-              {page === 'gallery' && <GalleryManager showToast={showToast} />}
+              {page === 'dashboard'  && <DashboardPage setPage={setPage} showToast={showToast} />}
+              {page === 'menu'       && <MenuManager showToast={showToast} />}
+              {page === 'categories' && <CategoriesPage showToast={showToast} />}
+              {page === 'specials'   && <SpecialsPage showToast={showToast} />}
+              {page === 'gallery'    && <GalleryManager showToast={showToast} />}
+              {page === 'content'    && <ContentPage showToast={showToast} />}
+              {page === 'settings'   && <SettingsPage showToast={showToast} />}
+              {page === 'analytics'  && <AnalyticsPage showToast={showToast} />}
+              {page === 'users'      && <UsersPage showToast={showToast} />}
             </div>
           </div>
           <ToastContainer toasts={toasts} />
@@ -874,30 +1603,21 @@
 
     /* ── APP ROOT ── */
     function App() {
-      const [auth, setAuth] = useState(null); // null = checking
+      const [auth, setAuth] = useState(null);
 
       useEffect(() => {
-        // Primary: check localStorage token (works regardless of proxy/session behaviour)
-        if (getStoredToken() === ADMIN_TOKEN) {
-          setAuth(true);
-          return;
-        }
-        // Fallback: check server session (works in production behind real server)
+        if (getStoredToken() === ADMIN_TOKEN) { setAuth(true); return; }
         fetch('/api/auth/status')
           .then(r => r.json())
           .then(d => {
-            if (d.authenticated) {
-              if (d.token) localStorage.setItem(STORE_KEY, d.token);
-              setAuth(true);
-            } else {
-              window.location.replace('/admin/login');
-            }
+            if (d.authenticated) { if (d.token) localStorage.setItem(STORE_KEY, d.token); setAuth(true); }
+            else window.location.replace('/admin/login');
           })
           .catch(() => window.location.replace('/admin/login'));
       }, []);
 
       if (auth === null) return <div className="init-loading"><div className="spinner"></div></div>;
-      return <Dashboard onLogout={() => window.location.replace('/admin/login')} />;
+      return <Shell />;
     }
 
     ReactDOM.createRoot(document.getElementById('root')).render(<App />);

@@ -31,6 +31,37 @@ const CATEGORY_TEASERS = {
 
 if (currentYear) currentYear.textContent = new Date().getFullYear();
 
+/* ── ANALYTICS ── */
+function getVisitorId() {
+  let id = localStorage.getItem('bbc_vid');
+  if (!id) { id = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('bbc_vid', id); }
+  return id;
+}
+
+function trackEvent(eventType, metadata = {}) {
+  fetch('/api/analytics/event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      event_type: eventType,
+      page_path: window.location.pathname,
+      referrer: document.referrer || '',
+      visitor_id: getVisitorId(),
+      metadata
+    })
+  }).catch(() => {});
+}
+
+trackEvent('page_view');
+
+document.querySelectorAll('[data-share-platform]').forEach(link => {
+  link.addEventListener('click', () => {
+    const platform = link.getAttribute('data-share-platform');
+    trackEvent('social_share_click', { platform });
+  });
+});
+
+
 /* ── LIGHTBOX ── */
 function openLightbox(src, alt) {
   lightboxImage.src = src;
