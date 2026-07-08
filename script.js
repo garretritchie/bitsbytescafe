@@ -20,6 +20,13 @@ const CATEGORY_LABELS = {
   'sides-salads': 'Sides & Salads',
   'other': 'Other'
 };
+const CATEGORY_TEASERS = {
+  'breakfast': 'Morning plates, omelets, pancakes, French toast, and breakfast sandwiches.',
+  'sandwiches-wraps-burgers': 'Sandwiches, wraps, subs, burgers, and hearty handheld favorites.',
+  'chicken-wings': 'Plain or flavored wings by size, plus dinner options.',
+  'lunch': 'Main dishes, dinner plates, seafood, vegetarian plates, and a la carte lunch options.',
+  'sides-salads': 'Rice, baked macaroni, fries, plantains, side salads, garden salads, and more.'
+};
 
 if (currentYear) currentYear.textContent = new Date().getFullYear();
 
@@ -135,20 +142,102 @@ function sortMenuItemsForDisplay(items) {
 }
 
 /* ── MENU FILTER ── */
-function setupMenuFilter() {
+function setupMenuFilter(onChange) {
   const filterButtons = document.querySelectorAll('[data-menu-filter]');
-  const cards = document.querySelectorAll('[data-menu-category]');
 
   filterButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       const filter = btn.getAttribute('data-menu-filter');
       filterButtons.forEach(b => b.classList.toggle('is-active', b === btn));
-      cards.forEach((card) => {
-        const cat = card.getAttribute('data-menu-category');
-        card.hidden = filter !== 'all' && cat !== filter;
-      });
+      onChange(filter);
     });
   });
+}
+
+function minCategoryPrice(items) {
+  const prices = items
+    .map(item => String(formatPrice(item)).match(/\$(\d+(?:\.\d{2})?)/))
+    .filter(Boolean)
+    .map(match => Number(match[1]))
+    .filter(price => Number.isFinite(price));
+
+  if (prices.length === 0) return '';
+  return `Starting at $${Math.min(...prices).toFixed(2)} + VAT`;
+}
+
+function categorySummaries(items) {
+  const categoryOrder = ['breakfast', 'lunch', 'chicken-wings', 'sandwiches-wraps-burgers', 'sides-salads'];
+
+  return categoryOrder
+    .map(category => {
+      const categoryItems = items.filter(item => item.category === category);
+      if (categoryItems.length === 0) return null;
+      const thumbnailItem = categoryItems.find(item => item.image) || categoryItems[0];
+      return {
+        category,
+        count: categoryItems.length,
+        price: minCategoryPrice(categoryItems),
+        thumbnail: thumbnailItem.image || '',
+        thumbnailAlt: thumbnailItem.imageAlt || thumbnailItem.name
+      };
+    })
+    .filter(Boolean);
+}
+
+function renderCategoryCards(grid, visible, selectCategory) {
+  grid.classList.add('is-category-view');
+  grid.innerHTML = categorySummaries(visible).map(summary => {
+    const label = CATEGORY_LABELS[summary.category] || summary.category;
+    const imgSrc = assetUrl(summary.thumbnail || MENU_IMAGE_FALLBACK);
+    const countLabel = summary.count === 1 ? '1 item' : `${summary.count} items`;
+    const sizeClass = summary.category === 'breakfast' || summary.category === 'lunch' ? 'category-card-large' : 'category-card-small';
+    return `
+      <article class="category-card ${sizeClass}" data-category-card="${escHtml(summary.category)}" role="button" tabindex="0" aria-label="View ${escHtml(label)} menu">
+        <img src="${escHtml(imgSrc)}" alt="${escHtml(summary.thumbnailAlt || label)}" loading="lazy" class="${summary.thumbnail ? '' : 'menu-fallback-image'}">
+        <div>
+          <span>${escHtml(countLabel)}</span>
+          <h3>${escHtml(label)}</h3>
+          <p>${escHtml(CATEGORY_TEASERS[summary.category] || 'Browse this menu category.')}</p>
+          <strong>${formatPriceHtml(summary.price)}</strong>
+        </div>
+      </article>`;
+  }).join('');
+
+  grid.querySelectorAll('[data-category-card]').forEach((card) => {
+    const openCategory = () => selectCategory(card.getAttribute('data-category-card'));
+    card.addEventListener('click', openCategory);
+    card.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      openCategory();
+    });
+  });
+}
+
+function renderItemCards(grid, items) {
+  grid.classList.remove('is-category-view');
+  grid.innerHTML = items.map(item => {
+    const price = formatPriceHtml(formatPrice(item));
+    const seasonal = item.seasonal
+      ? '<span class="seasonal-badge" style="display:inline-block;padding:2px 8px;background:#fff3e8;color:#f36c13;border-radius:999px;font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;margin-top:4px">Seasonal</span>'
+      : '';
+    const imgSrc = assetUrl(item.image || MENU_IMAGE_FALLBACK);
+    const imgAlt = item.image ? (item.imageAlt || item.name) : 'Photo Unavailable';
+    const teaser = shortDescription(item.description);
+    return `
+      <article class="plate-card" data-menu-category="${escHtml(item.category)}" data-menu-detail="${escHtml(item.id)}" role="button" tabindex="0" aria-label="View details for ${escHtml(item.name)}">
+        <img src="${escHtml(imgSrc)}" alt="${escHtml(imgAlt)}" loading="lazy" class="${item.image ? '' : 'menu-fallback-image'}">
+        <div>
+          <h3>${escHtml(item.name)}</h3>
+          ${teaser ? `<p>${escHtml(teaser)}</p>` : ''}
+          ${seasonal}
+        </div>
+        <footer>
+          <strong>${price}</strong>
+          <span class="plate-card-details">Details</span>
+        </footer>
+      </article>`;
+  }).join('');
 }
 
 /* ── RENDER MENU ── */
@@ -165,44 +254,40 @@ async function renderMenu() {
       return;
     }
 
-    grid.innerHTML = visible.map(item => {
-      const price = formatPriceHtml(formatPrice(item));
-      const seasonal = item.seasonal
-        ? '<span class="seasonal-badge" style="display:inline-block;padding:2px 8px;background:#fff3e8;color:#f36c13;border-radius:999px;font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;margin-top:4px">Seasonal</span>'
-        : '';
-      const imgSrc = assetUrl(item.image || MENU_IMAGE_FALLBACK);
-      const imgAlt = item.image ? (item.imageAlt || item.name) : 'Photo Unavailable';
-      const teaser = shortDescription(item.description);
-      return `
-        <article class="plate-card" data-menu-category="${escHtml(item.category)}" data-menu-detail="${escHtml(item.id)}" role="button" tabindex="0" aria-label="View details for ${escHtml(item.name)}">
-          <img src="${escHtml(imgSrc)}" alt="${escHtml(imgAlt)}" loading="lazy" class="${item.image ? '' : 'menu-fallback-image'}">
-          <div>
-            <h3>${escHtml(item.name)}</h3>
-            ${teaser ? `<p>${escHtml(teaser)}</p>` : ''}
-            ${seasonal}
-          </div>
-          <footer>
-            <strong>${price}</strong>
-            <span class="plate-card-details">Details</span>
-          </footer>
-        </article>`;
-    }).join('');
-
     const itemMap = new Map(visible.map(item => [String(item.id), item]));
-    grid.querySelectorAll('[data-menu-detail]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const item = itemMap.get(btn.getAttribute('data-menu-detail'));
-        if (item) openMenuModal(item);
-      });
-      btn.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter' && e.key !== ' ') return;
-        e.preventDefault();
-        const item = itemMap.get(btn.getAttribute('data-menu-detail'));
-        if (item) openMenuModal(item);
-      });
-    });
 
-    setupMenuFilter();
+    function bindItemCards() {
+      grid.querySelectorAll('[data-menu-detail]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const item = itemMap.get(btn.getAttribute('data-menu-detail'));
+          if (item) openMenuModal(item);
+        });
+        btn.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          const item = itemMap.get(btn.getAttribute('data-menu-detail'));
+          if (item) openMenuModal(item);
+        });
+      });
+    }
+
+    function selectCategory(category) {
+      document.querySelectorAll('[data-menu-filter]').forEach(btn => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-menu-filter') === category);
+      });
+      renderItemCards(grid, visible.filter(item => item.category === category));
+      bindItemCards();
+    }
+
+    renderCategoryCards(grid, visible, selectCategory);
+    setupMenuFilter((filter) => {
+      if (filter === 'all') {
+        renderCategoryCards(grid, visible, selectCategory);
+        return;
+      }
+      renderItemCards(grid, visible.filter(item => item.category === filter));
+      bindItemCards();
+    });
   } catch {
     grid.innerHTML = '<p style="color:#62666d;font-size:0.9rem;padding:16px 0">Could not load menu. Please refresh.</p>';
   }
