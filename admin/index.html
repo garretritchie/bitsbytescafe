@@ -265,7 +265,15 @@
     }
 
     /* ── MENU ITEM FORM ── */
-    const CATEGORIES = ['breakfast','lunch','wings','burgers','sides','drinks','other'];
+    const CATEGORIES = ['breakfast','sandwiches-wraps-burgers','chicken-wings','lunch-dinner-plates','sides-salads','other'];
+    const CATEGORY_LABELS = {
+      'breakfast': 'Breakfast',
+      'sandwiches-wraps-burgers': 'Sandwiches, Wraps & Burgers',
+      'chicken-wings': 'Chicken Wings',
+      'lunch-dinner-plates': 'Lunch & Dinner Plates',
+      'sides-salads': 'Sides & Salads',
+      'other': 'Other'
+    };
 
     function MenuItemForm({ item, onSave, onCancel, loading }) {
       const [name, setName] = useState(item?.name || '');
@@ -334,7 +342,7 @@
                 <label htmlFor="item-cat">Category</label>
                 <select id="item-cat" value={category} onChange={e => setCategory(e.target.value)}>
                   {CATEGORIES.map(c => (
-                    <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                    <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>
                   ))}
                 </select>
               </div>
@@ -538,7 +546,7 @@
               />
               <select className="filter-select" value={filterCat} onChange={e => setFilterCat(e.target.value)}>
                 <option value="all">All categories</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                {CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>)}
               </select>
               <select className="filter-select" value={filterSeasonal} onChange={e => setFilterSeasonal(e.target.value)}>
                 <option value="all">All items</option>
