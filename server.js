@@ -4,6 +4,7 @@ import multer from 'multer';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
 import { readFile, writeFile, mkdir, unlink } from 'node:fs/promises';
+import { readFileSync as readFileSyncFs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
@@ -14,6 +15,15 @@ const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
 const MENU_FILE   = path.join(DATA_DIR, 'menu.json');
 const GALLERY_FILE = path.join(DATA_DIR, 'gallery.json');
 const CMS_FILE    = path.join(DATA_DIR, 'cms-data.json');
+
+// ── Load .env if env vars are missing ──────────────────────────────────────
+try {
+  const envText = readFileSyncFs(path.join(__dirname, '.env'), 'utf8');
+  for (const line of envText.split('\n')) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.+)$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+  }
+} catch {}
 
 await mkdir(DATA_DIR, { recursive: true });
 await mkdir(UPLOADS_DIR, { recursive: true });
@@ -252,38 +262,46 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
 
 // ── Menu Categories ───────────────────────────────────────────────────────────
 app.get('/api/categories', async (req, res) => {
-  const { data, error } = await supabase.from('menu_categories').select('*').order('display_order');
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data || []);
+  try {
+    const { data, error } = await supabase.from('menu_categories').select('*').order('display_order');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/categories', requireAuth, async (req, res) => {
-  const b = req.body;
-  const { data, error } = await supabase.from('menu_categories').insert({
-    name: b.name?.trim(), slug: b.slug?.trim()||b.name?.toLowerCase().replace(/\s+/g,'-'),
-    description: b.description?.trim()||'', display_order: parseInt(b.display_order)||0
-  }).select().single();
-  if (error) return res.status(500).json({ error: error.message });
-  await logActivity('content_created','category',data.id,`Category "${data.name}" created`);
-  res.json(data);
+  try {
+    const b = req.body;
+    const { data, error } = await supabase.from('menu_categories').insert({
+      name: b.name?.trim(), slug: b.slug?.trim()||b.name?.toLowerCase().replace(/\s+/g,'-'),
+      description: b.description?.trim()||'', display_order: parseInt(b.display_order)||0
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    await logActivity('content_created','category',data.id,`Category "${data.name}" created`);
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/categories/:id', requireAuth, async (req, res) => {
-  const b = req.body;
-  const { data, error } = await supabase.from('menu_categories').update({
-    name: b.name?.trim(), slug: b.slug?.trim(), description: b.description?.trim()||'',
-    display_order: parseInt(b.display_order)||0, is_active: b.is_active !== false && b.is_active !== 'false',
-    updated_at: new Date().toISOString()
-  }).eq('id', req.params.id).select().single();
-  if (error) return res.status(500).json({ error: error.message });
-  await logActivity('content_updated','category',data.id,`Category "${data.name}" updated`);
-  res.json(data);
+  try {
+    const b = req.body;
+    const { data, error } = await supabase.from('menu_categories').update({
+      name: b.name?.trim(), slug: b.slug?.trim(), description: b.description?.trim()||'',
+      display_order: parseInt(b.display_order)||0, is_active: b.is_active !== false && b.is_active !== 'false',
+      updated_at: new Date().toISOString()
+    }).eq('id', req.params.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    await logActivity('content_updated','category',data.id,`Category "${data.name}" updated`);
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/categories/:id', requireAuth, async (req, res) => {
-  const { data } = await supabase.from('menu_categories').update({ is_active:false, updated_at:new Date().toISOString() }).eq('id',req.params.id).select().single();
-  await logActivity('content_disabled','category',req.params.id,`Category disabled`);
-  res.json({ ok:true, data });
+  try {
+    const { data } = await supabase.from('menu_categories').update({ is_active:false, updated_at:new Date().toISOString() }).eq('id',req.params.id).select().single();
+    await logActivity('content_disabled','category',req.params.id,`Category disabled`);
+    res.json({ ok:true, data });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Menu Items ────────────────────────────────────────────────────────────────
@@ -363,50 +381,60 @@ app.delete('/api/menu/:id', requireAuth, async (req, res) => {
 
 // ── Specials ──────────────────────────────────────────────────────────────────
 app.get('/api/specials', async (req, res) => {
-  const { data, error } = await supabase.from('specials').select('*').order('display_order');
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data||[]);
+  try {
+    const { data, error } = await supabase.from('specials').select('*').order('display_order');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data||[]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/specials', requireAuth, async (req, res) => {
-  const b = req.body;
-  const { data, error } = await supabase.from('specials').insert({
-    title: b.title?.trim(), description: b.description?.trim()||'',
-    image_url: b.image_url||'', start_date: b.start_date||null, end_date: b.end_date||null,
-    is_active: b.is_active !== false && b.is_active !== 'false',
-    display_order: parseInt(b.display_order)||0,
-    cta_label: b.cta_label||'', cta_url: b.cta_url||''
-  }).select().single();
-  if (error) return res.status(500).json({ error: error.message });
-  await logActivity('content_created','special',data.id,`Special "${data.title}" created`);
-  res.json(data);
+  try {
+    const b = req.body;
+    const { data, error } = await supabase.from('specials').insert({
+      title: b.title?.trim(), description: b.description?.trim()||'',
+      image_url: b.image_url||'', start_date: b.start_date||null, end_date: b.end_date||null,
+      is_active: b.is_active !== false && b.is_active !== 'false',
+      display_order: parseInt(b.display_order)||0,
+      cta_label: b.cta_label||'', cta_url: b.cta_url||''
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    await logActivity('content_created','special',data.id,`Special "${data.title}" created`);
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/specials/:id', requireAuth, async (req, res) => {
-  const b = req.body;
-  const { data, error } = await supabase.from('specials').update({
-    title: b.title?.trim(), description: b.description?.trim()||'',
-    image_url: b.image_url||'', start_date: b.start_date||null, end_date: b.end_date||null,
-    is_active: b.is_active !== false && b.is_active !== 'false',
-    display_order: parseInt(b.display_order)||0,
-    cta_label: b.cta_label||'', cta_url: b.cta_url||'',
-    updated_at: new Date().toISOString()
-  }).eq('id', req.params.id).select().single();
-  if (error) return res.status(500).json({ error: error.message });
-  await logActivity('content_updated','special',data.id,`Special "${data.title}" updated`);
-  res.json(data);
+  try {
+    const b = req.body;
+    const { data, error } = await supabase.from('specials').update({
+      title: b.title?.trim(), description: b.description?.trim()||'',
+      image_url: b.image_url||'', start_date: b.start_date||null, end_date: b.end_date||null,
+      is_active: b.is_active !== false && b.is_active !== 'false',
+      display_order: parseInt(b.display_order)||0,
+      cta_label: b.cta_label||'', cta_url: b.cta_url||'',
+      updated_at: new Date().toISOString()
+    }).eq('id', req.params.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    await logActivity('content_updated','special',data.id,`Special "${data.title}" updated`);
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/specials/:id', requireAuth, async (req, res) => {
-  await supabase.from('specials').update({ is_active:false, updated_at:new Date().toISOString() }).eq('id',req.params.id);
-  await logActivity('content_disabled','special',req.params.id,'Special disabled');
-  res.json({ ok:true });
+  try {
+    await supabase.from('specials').update({ is_active:false, updated_at:new Date().toISOString() }).eq('id',req.params.id);
+    await logActivity('content_disabled','special',req.params.id,'Special disabled');
+    res.json({ ok:true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Site Settings ─────────────────────────────────────────────────────────────
 app.get('/api/settings', requireAuth, async (req, res) => {
-  const { data } = await supabase.from('site_settings').select('*').maybeSingle();
-  res.json(data || {});
+  try {
+    const { data } = await supabase.from('site_settings').select('*').maybeSingle();
+    res.json(data || {});
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/settings', requireAuth, async (req, res) => {
@@ -454,8 +482,10 @@ app.post('/api/settings/hero-image', requireAuth, memUpload.single('image'), asy
 
 // ── Website Sections ──────────────────────────────────────────────────────────
 app.get('/api/sections', requireAuth, async (req, res) => {
-  const { data } = await supabase.from('website_sections').select('*').order('display_order');
-  res.json(data||[]);
+  try {
+    const { data } = await supabase.from('website_sections').select('*').order('display_order');
+    res.json(data||[]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/sections/:key', requireAuth, async (req, res) => {
@@ -478,34 +508,42 @@ app.put('/api/sections/:key', requireAuth, async (req, res) => {
 
 // ── Social Links ──────────────────────────────────────────────────────────────
 app.get('/api/social-links', async (req, res) => {
-  const { data } = await supabase.from('social_links').select('*').order('display_order');
-  res.json(data||[]);
+  try {
+    const { data } = await supabase.from('social_links').select('*').order('display_order');
+    res.json(data||[]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/social-links', requireAuth, async (req, res) => {
-  const b = req.body;
-  const { data, error } = await supabase.from('social_links').insert({
-    platform:b.platform?.trim(), url:b.url?.trim(), label:b.label?.trim()||'',
-    display_order:parseInt(b.display_order)||0
-  }).select().single();
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  try {
+    const b = req.body;
+    const { data, error } = await supabase.from('social_links').insert({
+      platform:b.platform?.trim(), url:b.url?.trim(), label:b.label?.trim()||'',
+      display_order:parseInt(b.display_order)||0
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/social-links/:id', requireAuth, async (req, res) => {
-  const b = req.body;
-  const { data, error } = await supabase.from('social_links').update({
-    platform:b.platform?.trim(), url:b.url?.trim(), label:b.label?.trim()||'',
-    display_order:parseInt(b.display_order)||0,
-    is_active:b.is_active!==false && b.is_active!=='false'
-  }).eq('id',req.params.id).select().single();
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  try {
+    const b = req.body;
+    const { data, error } = await supabase.from('social_links').update({
+      platform:b.platform?.trim(), url:b.url?.trim(), label:b.label?.trim()||'',
+      display_order:parseInt(b.display_order)||0,
+      is_active:b.is_active!==false && b.is_active!=='false'
+    }).eq('id',req.params.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/social-links/:id', requireAuth, async (req, res) => {
-  await supabase.from('social_links').delete().eq('id',req.params.id);
-  res.json({ ok:true });
+  try {
+    await supabase.from('social_links').delete().eq('id',req.params.id);
+    res.json({ ok:true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Gallery / Media Assets ────────────────────────────────────────────────────
@@ -554,41 +592,49 @@ app.delete('/api/gallery/:id', requireAuth, async (req, res) => {
 
 // ── Admin Users ───────────────────────────────────────────────────────────────
 app.get('/api/users', requireAuth, async (req, res) => {
-  const { data } = await supabase.from('admin_user_profiles').select('*').order('created_at');
-  res.json(data||[]);
+  try {
+    const { data } = await supabase.from('admin_user_profiles').select('*').order('created_at');
+    res.json(data||[]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/users', requireAuth, async (req, res) => {
-  const b = req.body;
-  const { data, error } = await supabase.from('admin_user_profiles').insert({
-    first_name:b.first_name?.trim()||'', last_name:b.last_name?.trim()||'',
-    email:b.email?.trim()?.toLowerCase(), role:b.role||'staff', status:b.status||'active',
-    notes:b.notes?.trim()||''
-  }).select().single();
-  if (error) return res.status(500).json({ error: error.message });
-  await logActivity('user_created','user',data.id,`Admin user "${data.email}" added`);
-  res.json(data);
+  try {
+    const b = req.body;
+    const { data, error } = await supabase.from('admin_user_profiles').insert({
+      first_name:b.first_name?.trim()||'', last_name:b.last_name?.trim()||'',
+      email:b.email?.trim()?.toLowerCase(), role:b.role||'staff', status:b.status||'active',
+      notes:b.notes?.trim()||''
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    await logActivity('user_created','user',data.id,`Admin user "${data.email}" added`);
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/users/:id', requireAuth, async (req, res) => {
-  const b = req.body;
-  const { data, error } = await supabase.from('admin_user_profiles').update({
-    first_name:b.first_name?.trim()||'', last_name:b.last_name?.trim()||'',
-    email:b.email?.trim()?.toLowerCase(), role:b.role||'staff',
-    status:b.status||'active', notes:b.notes?.trim()||'',
-    updated_at: new Date().toISOString()
-  }).eq('id',req.params.id).select().single();
-  if (error) return res.status(500).json({ error: error.message });
-  await logActivity('user_updated','user',data.id,`Admin user "${data.email}" updated`);
-  res.json(data);
+  try {
+    const b = req.body;
+    const { data, error } = await supabase.from('admin_user_profiles').update({
+      first_name:b.first_name?.trim()||'', last_name:b.last_name?.trim()||'',
+      email:b.email?.trim()?.toLowerCase(), role:b.role||'staff',
+      status:b.status||'active', notes:b.notes?.trim()||'',
+      updated_at: new Date().toISOString()
+    }).eq('id',req.params.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    await logActivity('user_updated','user',data.id,`Admin user "${data.email}" updated`);
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/users/:id', requireAuth, async (req, res) => {
-  const { data } = await supabase.from('admin_user_profiles').update({
-    status:'disabled', updated_at:new Date().toISOString()
-  }).eq('id',req.params.id).select().single();
-  await logActivity('user_disabled','user',req.params.id,`Admin user disabled`);
-  res.json({ ok:true, data });
+  try {
+    const { data } = await supabase.from('admin_user_profiles').update({
+      status:'disabled', updated_at:new Date().toISOString()
+    }).eq('id',req.params.id).select().single();
+    await logActivity('user_disabled','user',req.params.id,`Admin user disabled`);
+    res.json({ ok:true, data });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Analytics ─────────────────────────────────────────────────────────────────
@@ -647,8 +693,10 @@ app.get('/api/analytics', requireAuth, async (req, res) => {
 
 // ── Activity Log ──────────────────────────────────────────────────────────────
 app.get('/api/activity-log', requireAuth, async (req, res) => {
-  const { data } = await supabase.from('admin_activity_log').select('*').order('created_at',{ascending:false}).limit(50);
-  res.json(data||[]);
+  try {
+    const { data } = await supabase.from('admin_activity_log').select('*').order('created_at',{ascending:false}).limit(50);
+    res.json(data||[]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Seed on startup ──────────────────────────────────────────────────────────
@@ -729,6 +777,14 @@ async function seedIfEmpty() {
 }
 
 const PORT = process.env.PORT || 3000;
+
+// Global error handler — ensures all unhandled errors return JSON, not HTML
+app.use((err, req, res, next) => {
+  console.error('Unhandled route error:', err.message);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: err.message || 'Internal server error' });
+});
+
 app.listen(PORT, async () => {
   console.log(`Bits & Bytes CMS running on port ${PORT}`);
   await seedIfEmpty();
