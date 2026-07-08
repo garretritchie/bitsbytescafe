@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Site Content — Bits &amp; Bytes CMS</title>
+    <link rel="icon" type="image/png" href="../images/bits-bytes-logo-circle-cropped.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="admin.css">
+    <style>
+      /* ── CMS-specific overrides ── */
+      .cms-layout {
+        display: flex;
+        min-height: 100vh;
+        background: #f4f5f7;
+      }
+      .cms-main {
+        flex: 1;
+        padding: 32px 40px;
+        max-width: 860px;
+      }
+      @media (max-width: 768px) { .cms-main { padding: 20px 16px; } }
+
+      .cms-page-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #1a1d23;
+        margin: 0 0 4px;
+      }
+      .cms-page-sub {
+        font-size: 0.85rem;
+        color: #62666d;
+        margin: 0 0 32px;
+      }
+
+      /* ── Panels ── */
+      .cms-panel {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e8eaed;
+        margin-bottom: 24px;
+        overflow: hidden;
+      }
+      .cms-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 24px;
+        border-bottom: 1px solid #f0f1f3;
+        background: #fafbfc;
+      }
+      .cms-panel-header h2 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #1a1d23;
+        margin: 0;
+      }
+      .cms-panel-body { padding: 24px; }
+
+      /* ── Form controls ── */
+      .field { margin-bottom: 20px; }
+      .field:last-child { margin-bottom: 0; }
+      .field label {
+        display: block;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #62666d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+      }
+      .field input[type="text"],
+      .field input[type="email"],
+      .field input[type="tel"],
+      .field input[type="time"],
+      .field textarea {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1.5px solid #d8dce2;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        color: #1a1d23;
+        background: #fff;
+        outline: none;
+        transition: border-color 150ms ease;
+        box-sizing: border-box;
+      }
+      .field input:focus,
+      .field textarea:focus { border-color: #f36c13; }
+      .field textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+      .field-hint {
+        font-size: 0.75rem;
+        color: #9aa0a6;
+        margin-top: 4px;
+      }
+      .field-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
+
+      /* ── Image upload ── */
+      .img-upload-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .img-preview-wrap {
+        width: 180px;
+        height: 120px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #f4f5f7;
+        border: 1.5px solid #e8eaed;
+        flex-shrink: 0;
+        position: relative;
+      }
+      .img-preview-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .img-upload-controls { flex: 1; min-width: 200px; }
+      .img-upload-controls .field { margin-bottom: 12px; }
+      .upload-note {
+        font-size: 0.75rem;
+        color: #9aa0a6;
+        margin-top: 6px;
+        line-height: 1.4;
+      }
+
+      /* ── Hours table ── */
+      .hours-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .hours-table th {
+        text-align: left;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #9aa0a6;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 0 8px 10px;
+      }
+      .hours-table th:first-child { padding-left: 0; }
+      .hours-table td {
+        padding: 6px 8px;
+        vertical-align: middle;
+      }
+      .hours-table td:first-child { padding-left: 0; }
+      .hours-table tr { border-bottom: 1px solid #f0f1f3; }
+      .hours-table tr:last-child { border-bottom: none; }
+      .day-label {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1a1d23;
+        white-space: nowrap;
+        width: 110px;
+      }
+      .hours-table input[type="time"] {
+        padding: 6px 10px;
+        border: 1.5px solid #d8dce2;
+        border-radius: 7px;
+        font-family: inherit;
+        font-size: 0.85rem;
+        color: #1a1d23;
+        background: #fff;
+        outline: none;
+        transition: border-color 150ms ease;
+        width: 120px;
+      }
+      .hours-table input[type="time"]:focus { border-color: #f36c13; }
+      .hours-table input[type="time"]:disabled {
+        background: #f4f5f7;
+        color: #b0b5bc;
+        border-color: #e8eaed;
+      }
+      .closed-col { text-align: center; }
+      .closed-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+        color: #62666d;
+        cursor: pointer;
+      }
+      .closed-toggle input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: #f36c13;
+        cursor: pointer;
+      }
+
+      /* ── Save row ── */
+      .save-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding-top: 4px;
+      }
+      .save-status {
+        font-size: 0.82rem;
+        color: #3c8c4e;
+        font-weight: 600;
+        opacity: 0;
+        transition: opacity 300ms ease;
+      }
+      .save-status.visible { opacity: 1; }
+      .save-status.error { color: #c0392b; }
+
+      /* ── Preview bar ── */
+      .preview-bar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: #1a1d23;
+        padding: 10px 40px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        border-bottom: 1px solid #2c3040;
+      }
+      @media (max-width: 768px) { .preview-bar { padding: 10px 16px; } }
+      .preview-bar span {
+        font-size: 0.82rem;
+        color: #9aa0a6;
+        flex: 1;
+      }
+      .btn-preview {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 16px;
+        border-radius: 7px;
+        border: 1.5px solid #3c4049;
+        background: transparent;
+        color: #fff;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 150ms ease, border-color 150ms ease;
+      }
+      .btn-preview:hover { background: #2c3040; border-color: #4a5060; }
+    </style>
+  </head>
+  <body>
+    <div class="cms-layout">
+      <!-- Sidebar reused from admin -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+          <img src="../images/bits-bytes-logo-wide-cropped.png" alt="Bits and Bytes Cafe" style="height:32px;width:auto;object-fit:contain;filter:brightness(0) invert(1);opacity:0.9">
+        </div>
+        <nav class="sidebar-nav" aria-label="Admin navigation">
+          <a href="/admin/" class="sidebar-link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Menu &amp; Gallery
+          </a>
+          <a href="/admin/cms" class="sidebar-link is-active">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Site Content
+          </a>
+          <a href="#" class="sidebar-link" id="logout-link" style="margin-top:auto">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Log Out
+          </a>
+        </nav>
+      </aside>
+
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+        <!-- Preview bar -->
+        <div class="preview-bar">
+          <span>Changes save immediately per section.</span>
+          <a href="/preview" target="_blank" rel="noopener" class="btn-preview">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Preview Site
+          </a>
+        </div>
+
+        <main class="cms-main">
+          <h1 class="cms-page-title">Site Content</h1>
+          <p class="cms-page-sub">Edit the landing page hero, hours, and contact details.</p>
+
+          <!-- Hero Text -->
+          <section class="cms-panel" id="panel-hero-text">
+            <div class="cms-panel-header">
+              <h2>Hero Text</h2>
+            </div>
+            <div class="cms-panel-body">
+              <div class="field">
+                <label for="hero-heading">Main Heading</label>
+                <input type="text" id="hero-heading" name="heading" maxlength="80" placeholder="Fresh bites.">
+              </div>
+              <div class="field">
+                <label for="hero-span">Heading Accent (second line)</label>
+                <input type="text" id="hero-span" name="headingSpan" maxlength="80" placeholder="Friendly bytes.">
+              </div>
+              <div class="field">
+                <label for="hero-subheading">Subheading</label>
+                <textarea id="hero-subheading" name="subheading" rows="3" maxlength="300" placeholder="Delicious, affordable breakfast..."></textarea>
+              </div>
+              <div class="save-row">
+                <button class="btn btn-primary" type="button" id="save-hero-text">Save Hero Text</button>
+                <span class="save-status" id="status-hero-text"></span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Hero Image -->
+          <section class="cms-panel" id="panel-hero-image">
+            <div class="cms-panel-header">
+              <h2>Hero Image</h2>
+            </div>
+            <div class="cms-panel-body">
+              <div class="img-upload-row">
+                <div class="img-preview-wrap">
+                  <img id="hero-img-preview" src="" alt="Hero image preview">
+                </div>
+                <div class="img-upload-controls">
+                  <div class="field">
+                    <label for="hero-image-file">Upload New Image</label>
+                    <input type="file" id="hero-image-file" accept="image/jpeg,image/png,image/webp" style="width:100%;font-size:0.85rem">
+                  </div>
+                  <p class="upload-note">Recommended: landscape photo, at least 1200×800px. Will be optimised and converted to WebP automatically. Max 10 MB.</p>
+                  <div class="save-row" style="padding-top:8px">
+                    <button class="btn btn-primary" type="button" id="save-hero-image">Upload &amp; Save</button>
+                    <span class="save-status" id="status-hero-image"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Hours -->
+          <section class="cms-panel" id="panel-hours">
+            <div class="cms-panel-header">
+              <h2>Opening Hours</h2>
+            </div>
+            <div class="cms-panel-body">
+              <table class="hours-table" id="hours-table">
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th>Opens</th>
+                    <th>Closes</th>
+                    <th class="closed-col">Closed</th>
+                  </tr>
+                </thead>
+                <tbody id="hours-body">
+                  <!-- populated by JS -->
+                </tbody>
+              </table>
+              <div class="save-row" style="margin-top:20px">
+                <button class="btn btn-primary" type="button" id="save-hours">Save Hours</button>
+                <span class="save-status" id="status-hours"></span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Contact -->
+          <section class="cms-panel" id="panel-contact">
+            <div class="cms-panel-header">
+              <h2>Contact &amp; Location</h2>
+            </div>
+            <div class="cms-panel-body">
+              <div class="field-row">
+                <div class="field">
+                  <label for="contact-phone">Phone Number</label>
+                  <input type="tel" id="contact-phone" placeholder="(242) 603-2487" maxlength="30">
+                  <p class="field-hint">Displayed on the site and used for the Call Us button.</p>
+                </div>
+                <div class="field">
+                  <label for="contact-whatsapp">WhatsApp Number</label>
+                  <input type="tel" id="contact-whatsapp" placeholder="(242) 825-2983" maxlength="30">
+                  <p class="field-hint">Used for the WhatsApp link button.</p>
+                </div>
+              </div>
+              <div class="field">
+                <label for="contact-address1">Street Address</label>
+                <input type="text" id="contact-address1" placeholder="Shirley Street" maxlength="100">
+              </div>
+              <div class="field">
+                <label for="contact-city">City / Country</label>
+                <input type="text" id="contact-city" placeholder="Nassau, Bahamas" maxlength="100">
+              </div>
+              <div class="save-row">
+                <button class="btn btn-primary" type="button" id="save-contact">Save Contact Info</button>
+                <span class="save-status" id="status-contact"></span>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      /* ── Auth guard ── */
+      fetch('/api/auth/status').then(r => r.json()).then(d => {
+        if (!d.authenticated) window.location.href = '/admin/';
+      });
+
+      document.getElementById('logout-link').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/admin/';
+      });
+
+      /* ── Helpers ── */
+      function showStatus(id, msg, isError = false) {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.className = 'save-status visible' + (isError ? ' error' : '');
+        clearTimeout(el._t);
+        el._t = setTimeout(() => { el.className = 'save-status'; }, 3500);
+      }
+
+      /* ── Load CMS data ── */
+      let cmsData = {};
+
+      async function loadCms() {
+        const res = await fetch('/api/cms/data');
+        cmsData = await res.json();
+
+        /* Hero text */
+        document.getElementById('hero-heading').value = cmsData.hero?.heading || '';
+        document.getElementById('hero-span').value = cmsData.hero?.headingSpan || '';
+        document.getElementById('hero-subheading').value = cmsData.hero?.subheading || '';
+
+        /* Hero image preview */
+        const imgSrc = cmsData.hero?.image || '';
+        const preview = document.getElementById('hero-img-preview');
+        preview.src = imgSrc ? (imgSrc.startsWith('http') ? imgSrc : '/' + imgSrc.replace(/^\//, '')) : '';
+
+        /* Hours */
+        renderHoursTable(cmsData.hours || []);
+
+        /* Contact */
+        document.getElementById('contact-phone').value = cmsData.contact?.phone || '';
+        document.getElementById('contact-whatsapp').value = cmsData.contact?.whatsapp || '';
+        document.getElementById('contact-address1').value = cmsData.contact?.addressLine1 || '';
+        document.getElementById('contact-city').value = cmsData.contact?.addressCity || '';
+      }
+
+      /* ── Hours table ── */
+      function renderHoursTable(hours) {
+        const tbody = document.getElementById('hours-body');
+        tbody.innerHTML = hours.map((h, i) => `
+          <tr>
+            <td class="day-label">${h.day}</td>
+            <td>
+              <input type="time" data-idx="${i}" data-field="open" value="${h.open || ''}" ${h.closed ? 'disabled' : ''}>
+            </td>
+            <td>
+              <input type="time" data-idx="${i}" data-field="close" value="${h.close || ''}" ${h.closed ? 'disabled' : ''}>
+            </td>
+            <td class="closed-col">
+              <label class="closed-toggle">
+                <input type="checkbox" data-idx="${i}" data-field="closed" ${h.closed ? 'checked' : ''}>
+                Closed
+              </label>
+            </td>
+          </tr>
+        `).join('');
+
+        /* Toggle closed state */
+        tbody.querySelectorAll('input[data-field="closed"]').forEach(cb => {
+          cb.addEventListener('change', () => {
+            const idx = parseInt(cb.dataset.idx);
+            const row = tbody.querySelectorAll('tr')[idx];
+            row.querySelectorAll('input[type="time"]').forEach(t => {
+              t.disabled = cb.checked;
+              if (cb.checked) t.value = '';
+            });
+          });
+        });
+      }
+
+      function collectHours() {
+        const tbody = document.getElementById('hours-body');
+        return (cmsData.hours || []).map((h, i) => {
+          const row = tbody.querySelectorAll('tr')[i];
+          const open = row.querySelector('[data-field="open"]').value;
+          const close = row.querySelector('[data-field="close"]').value;
+          const closed = row.querySelector('[data-field="closed"]').checked;
+          return { day: h.day, open: closed ? '' : open, close: closed ? '' : close, closed };
+        });
+      }
+
+      /* ── Save: Hero Text ── */
+      document.getElementById('save-hero-text').addEventListener('click', async () => {
+        const body = {
+          heading: document.getElementById('hero-heading').value.trim(),
+          headingSpan: document.getElementById('hero-span').value.trim(),
+          subheading: document.getElementById('hero-subheading').value.trim()
+        };
+        try {
+          const res = await fetch('/admin/cms/hero-text', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+          Object.assign(cmsData.hero, body);
+          showStatus('status-hero-text', 'Saved!');
+        } catch (e) {
+          showStatus('status-hero-text', e.message, true);
+        }
+      });
+
+      /* ── Save: Hero Image ── */
+      document.getElementById('save-hero-image').addEventListener('click', async () => {
+        const file = document.getElementById('hero-image-file').files[0];
+        if (!file) { showStatus('status-hero-image', 'Please choose a file first.', true); return; }
+        const fd = new FormData();
+        fd.append('image', file);
+        try {
+          const res = await fetch('/admin/cms/hero-image', { method: 'POST', body: fd });
+          if (!res.ok) throw new Error((await res.json()).error || 'Upload failed');
+          const data = await res.json();
+          cmsData.hero.image = data.image;
+          document.getElementById('hero-img-preview').src = '/' + data.image;
+          document.getElementById('hero-image-file').value = '';
+          showStatus('status-hero-image', 'Image saved!');
+        } catch (e) {
+          showStatus('status-hero-image', e.message, true);
+        }
+      });
+
+      /* Preview file before upload */
+      document.getElementById('hero-image-file').addEventListener('change', (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        const url = URL.createObjectURL(f);
+        document.getElementById('hero-img-preview').src = url;
+      });
+
+      /* ── Save: Hours ── */
+      document.getElementById('save-hours').addEventListener('click', async () => {
+        const hours = collectHours();
+        try {
+          const res = await fetch('/admin/cms/hours', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hours }) });
+          if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+          cmsData.hours = hours;
+          showStatus('status-hours', 'Saved!');
+        } catch (e) {
+          showStatus('status-hours', e.message, true);
+        }
+      });
+
+      /* ── Save: Contact ── */
+      document.getElementById('save-contact').addEventListener('click', async () => {
+        const body = {
+          phone: document.getElementById('contact-phone').value.trim(),
+          whatsapp: document.getElementById('contact-whatsapp').value.trim(),
+          addressLine1: document.getElementById('contact-address1').value.trim(),
+          addressCity: document.getElementById('contact-city').value.trim()
+        };
+        try {
+          const res = await fetch('/admin/cms/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+          Object.assign(cmsData.contact, body);
+          showStatus('status-contact', 'Saved!');
+        } catch (e) {
+          showStatus('status-contact', e.message, true);
+        }
+      });
+
+      loadCms();
+    </script>
+  </body>
+</html>

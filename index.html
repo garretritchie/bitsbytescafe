@@ -27,7 +27,7 @@
           <a href="#visit">Visit</a>
           <a href="#updates">Facebook</a>
         </nav>
-        <a class="header-phone" href="tel:+12426032487" aria-label="Call Bits and Bytes Cafe at 242 603 2487">(242) 603-2487</a>
+        <a class="header-phone" href="tel:{{PHONE_TEL}}" aria-label="Call Bits and Bytes Cafe at {{PHONE_DISPLAY}}">{{PHONE_DISPLAY}}</a>
       </header>
 
       <main id="top">
@@ -35,8 +35,8 @@
         <div class="hero-inner">
           <div class="hero-copy">
             <p class="location-pill">Nassau, Bahamas</p>
-            <h1 id="hero-title">Fresh bites.<br><span>Friendly bytes.</span></h1>
-            <p class="hero-subtitle">Delicious, affordable breakfast, lunch, coffee, and comfort food with local Bahamian flavor.</p>
+            <h1 id="hero-title">{{HERO_HEADING}}<br><span>{{HERO_HEADING_SPAN}}</span></h1>
+            <p class="hero-subtitle">{{HERO_SUBHEADING}}</p>
             <div class="hero-actions" aria-label="Primary actions">
               <a class="button primary" href="#menu">View Menu</a>
               <a class="button secondary" href="https://www.facebook.com/bitsbytescafe" target="_blank" rel="noopener">See Specials on Facebook</a>
@@ -44,7 +44,7 @@
             <p class="care-note">Made fresh. Served with care.</p>
           </div>
           <div class="hero-media" aria-label="Featured Bits and Bytes Cafe plate">
-            <img class="hero-reference-image" src="images/74604694_795940760878125_3195495164743254016_n.jpg" alt="Crispy chicken with fresh garden salad from Bits and Bytes Cafe">
+            <img class="hero-reference-image" src="{{HERO_IMAGE}}" alt="Crispy chicken with fresh garden salad from Bits and Bytes Cafe">
           </div>
         </div>
       </section>
@@ -73,7 +73,7 @@
         <article>
           <span class="feature-icon clock" aria-hidden="true"></span>
           <h2>Hours &amp; Contact</h2>
-          <p>Mon - Sat: 7:00am - 4:00pm<br>242-603-2487</p>
+          <p>{{HOURS_FEATURE}}<br>{{PHONE_DISPLAY}}</p>
         </article>
       </section>
 
@@ -146,15 +146,15 @@
           <p>Good food. Good people. Good vibes.<br>We can't wait to serve you!</p>
         </div>
         <div class="visit-actions" aria-label="Contact Bits and Bytes Cafe">
-          <a href="tel:+12426032487">
+          <a href="tel:{{PHONE_TEL}}">
             <span aria-hidden="true">P</span>
             <strong>Call Us</strong>
-            <small>(242) 603-2487</small>
+            <small>{{PHONE_DISPLAY}}</small>
           </a>
-          <a href="https://wa.me/12428252983" target="_blank" rel="noopener">
+          <a href="{{WHATSAPP_WAME}}" target="_blank" rel="noopener">
             <span aria-hidden="true">W</span>
             <strong>WhatsApp</strong>
-            <small>(242) 825-2983</small>
+            <small>{{WHATSAPP_DISPLAY}}</small>
           </a>
           <a href="https://www.facebook.com/bitsbytescafe" target="_blank" rel="noopener">
             <span aria-hidden="true">f</span>
@@ -164,8 +164,8 @@
         </div>
         <div class="direction-card">
           <div>
-            <strong>Shirley Street</strong>
-            <span>Nassau, Bahamas</span>
+            <strong>{{ADDRESS_LINE1}}</strong>
+            <span>{{ADDRESS_CITY}}</span>
             <a href="https://maps.app.goo.gl/gfFT5uFtX3wofoPz5" target="_blank" rel="noopener">Get Directions -></a>
           </div>
           <iframe
@@ -191,8 +191,7 @@
       </div>
       <div>
         <h2>Hours</h2>
-        <p>Mon - Sat<br>7:00am - 4:00pm</p>
-        <p>Sunday<br>Closed</p>
+        {{FOOTER_HOURS_HTML}}
       </div>
       <div>
         <h2>Follow Us</h2>

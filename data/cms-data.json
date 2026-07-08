@@ -1,0 +1,24 @@
+{
+  "hero": {
+    "heading": "Fresh bites.",
+    "headingSpan": "Friendly bytes.",
+    "subheading": "Delicious, affordable breakfast, lunch, coffee, and comfort food with local Bahamian flavor.",
+    "image": "images/74604694_795940760878125_3195495164743254016_n.jpg"
+  },
+  "hours": [
+    { "day": "Monday",    "open": "07:00", "close": "16:00", "closed": false },
+    { "day": "Tuesday",   "open": "07:00", "close": "16:00", "closed": false },
+    { "day": "Wednesday", "open": "07:00", "close": "16:00", "closed": false },
+    { "day": "Thursday",  "open": "07:00", "close": "16:00", "closed": false },
+    { "day": "Friday",    "open": "07:00", "close": "16:00", "closed": false },
+    { "day": "Saturday",  "open": "07:00", "close": "16:00", "closed": false },
+    { "day": "Sunday",    "open": "",      "close": "",      "closed": true  }
+  ],
+  "contact": {
+    "phone": "(242) 603-2487",
+    "whatsapp": "(242) 825-2983",
+    "email": "",
+    "addressLine1": "Shirley Street",
+    "addressCity": "Nassau, Bahamas"
+  }
+}
