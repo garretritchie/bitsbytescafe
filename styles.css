@@ -968,17 +968,31 @@ main {
 
 .admin-link {
   position: absolute;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.72rem !important;
-  color: rgba(98, 102, 109, 0.55) !important;
+  bottom: 40px;
+  left: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: 6px;
+  background: var(--orange);
+  color: #fff !important;
+  font-size: 0.75rem !important;
+  font-weight: 800;
   text-decoration: none;
-  transition: color 160ms ease;
+  transition: background 160ms ease, transform 120ms ease;
+  margin: 0 !important;
 }
 
 .admin-link:hover {
-  color: var(--muted) !important;
+  background: var(--orange-dark);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 560px) {
+  .admin-link {
+    left: 16px;
+    bottom: 58px;
+  }
 }
 
 .lightbox {
