@@ -151,7 +151,7 @@ function toWaMe(phone) {
 }
 
 async function renderIndex(cms) {
-  let html = await readFile(path.join(__dirname, 'index.html'), 'utf8');
+  let html = await readFile(path.join(__dirname, 'index.template.html'), 'utf8');
   const replacements = {
     '{{HERO_HEADING}}':      escH(cms.hero.heading),
     '{{HERO_HEADING_SPAN}}': escH(cms.hero.headingSpan),

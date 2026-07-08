@@ -75,7 +75,7 @@ function toWaMe(phone) {
 }
 
 const cms = JSON.parse(await readFile("data/cms-data.json", "utf8"));
-let html = await readFile("index.html", "utf8");
+let html = await readFile("index.template.html", "utf8");
 const replacements = {
   "{{HERO_HEADING}}": escH(cms.hero.heading),
   "{{HERO_HEADING_SPAN}}": escH(cms.hero.headingSpan),
@@ -97,8 +97,9 @@ for (const [token, value] of Object.entries(replacements)) {
 
 await cp("package.json", "dist/package.json");
 await cp("server.js", "dist/server.js");
-await cp("index.html", "dist/index.template.html");
+await cp("index.template.html", "dist/index.template.html");
 await mkdir("dist/scripts", { recursive: true });
 await cp("scripts/seed.mjs", "dist/scripts/seed.mjs");
 await cp("package-lock.json", "dist/package-lock.json");
+await writeFile("index.html", html, "utf8");
 await writeFile("dist/index.html", html, "utf8");
