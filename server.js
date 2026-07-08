@@ -818,12 +818,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-export default app;
-
-// Only start HTTP server when run directly (not when imported by Netlify Function)
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  app.listen(PORT, async () => {
-    console.log(`Bits & Bytes CMS running on port ${PORT}`);
-    await seedIfEmpty();
-  });
-}
+app.listen(PORT, async () => {
+  console.log(`Bits & Bytes CMS running on port ${PORT}`);
+  await seedIfEmpty();
+});
