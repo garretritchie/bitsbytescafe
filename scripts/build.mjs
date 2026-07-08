@@ -1,5 +1,21 @@
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { createClient } from "@supabase/supabase-js";
+
+// Load .env if env vars are missing
+try {
+  const envText = readFileSync(".env", "utf8");
+  for (const line of envText.split("\n")) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.+)$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+  }
+} catch {}
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+
+const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
 
 const files = ["styles.css", "script.js"];
 const directories = ["images", "data", "admin"];
@@ -196,8 +212,50 @@ function sitemapXml() {
 `;
 }
 
-const cms = JSON.parse(await readFile("data/cms-data.json", "utf8"));
-const menu = JSON.parse(await readFile("data/menu.json", "utf8"));
+// Read CMS data — prefer Supabase, fall back to local JSON
+let cms, menu;
+try {
+  const { data: siteSettings } = await sb.from("site_settings").select("*").maybeSingle();
+  const { data: menuItems } = await sb.from("menu_items").select("*").eq("available", true).order("display_order");
+  if (siteSettings) {
+    cms = {
+      hero: {
+        heading: siteSettings.hero_heading || "Fresh bites.",
+        headingSpan: siteSettings.hero_heading_span || "Friendly bytes.",
+        subheading: siteSettings.hero_subheading || "",
+        image: siteSettings.hero_image_url || "images/74604694_795940760878125_3195495164743254016_n.jpg",
+      },
+      hours: siteSettings.opening_hours || [],
+      contact: {
+        phone: siteSettings.primary_phone || "",
+        whatsapp: siteSettings.whatsapp || "",
+        email: siteSettings.email || "",
+        addressLine1: siteSettings.address_line1 || "",
+        addressCity: siteSettings.address_city || "",
+      },
+    };
+    console.log("Build: loaded CMS data from Supabase");
+  } else {
+    throw new Error("No site_settings row");
+  }
+  if (menuItems?.length) {
+    menu = menuItems.map(item => ({
+      ...item,
+      category: item.category || item.category_id || "",
+      image: item.image_url,
+      available: item.available,
+      price: item.price,
+    }));
+    console.log(`Build: loaded ${menu.length} menu items from Supabase`);
+  } else {
+    throw new Error("No menu items");
+  }
+} catch (err) {
+  console.warn("Build: falling back to local JSON files:", err.message);
+  cms = JSON.parse(await readFile("data/cms-data.json", "utf8"));
+  menu = JSON.parse(await readFile("data/menu.json", "utf8"));
+}
+
 let html = await readFile("index.template.html", "utf8");
 const replacements = {
   "{{SEO_HEAD}}": seoHead(cms, menu),
@@ -231,3 +289,16 @@ await writeFile("robots.txt", robotsTxt(), "utf8");
 await writeFile("dist/robots.txt", robotsTxt(), "utf8");
 await writeFile("sitemap.xml", sitemapXml(), "utf8");
 await writeFile("dist/sitemap.xml", sitemapXml(), "utf8");
+
+// Inject Supabase credentials into admin HTML files so the SPA works without Express
+async function injectAdminCreds(filePath) {
+  if (!existsSync(filePath)) return;
+  let content = await readFile(filePath, "utf8");
+  content = content
+    .replaceAll("{{SUPABASE_URL}}", SUPABASE_URL)
+    .replaceAll("{{SUPABASE_ANON_KEY}}", SUPABASE_ANON_KEY);
+  await writeFile(filePath, content, "utf8");
+}
+await injectAdminCreds("admin/index.html");
+await injectAdminCreds("dist/admin/index.html");
+console.log("Build: injected Supabase credentials into admin HTML");

@@ -16,8 +16,18 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    // Credentials injected at build time — safe to expose (anon key is public by design)
+    window.BBC_SUPABASE_URL = 'https://rqjkqigxwqyxyexrfykb.supabase.co';
+    window.BBC_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxamtxaWd4d3F5eHlleHJmeWtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1MTczNTIsImV4cCI6MjA5OTA5MzM1Mn0.J97To7TUkxqfVlS5ZfIx8P106Ng2tuIr64XgfjvNd4E';
+  </script>
   <script type="text/babel">
     const { useState, useEffect, useCallback, useRef } = React;
+    const { createClient } = supabase;
+
+    /* ── SUPABASE CLIENT ── */
+    const sb = createClient(window.BBC_SUPABASE_URL, window.BBC_SUPABASE_ANON_KEY);
 
     /* ── AUTH HELPERS ── */
     const ADMIN_TOKEN = btoa('admin:password123');
@@ -25,6 +35,42 @@
     const MENU_IMAGE_FALLBACK = '/images/menu-photo-unavailable.svg';
     function getStoredToken() { return localStorage.getItem(STORE_KEY) || ''; }
     function clearStoredToken() { localStorage.removeItem(STORE_KEY); }
+
+    /* ── SUPABASE DATA HELPERS ── */
+    async function sbGet(table, opts = {}) {
+      let q = sb.from(table).select(opts.select || '*');
+      if (opts.order) q = q.order(opts.order, { ascending: opts.asc !== false });
+      if (opts.eq) for (const [col, val] of Object.entries(opts.eq)) q = q.eq(col, val);
+      if (opts.limit) q = q.limit(opts.limit);
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      return data;
+    }
+    async function sbInsert(table, row) {
+      const { data, error } = await sb.from(table).insert(row).select().single();
+      if (error) throw new Error(error.message);
+      return data;
+    }
+    async function sbUpdate(table, id, changes) {
+      const { data, error } = await sb.from(table).update(changes).eq('id', id).select().single();
+      if (error) throw new Error(error.message);
+      return data;
+    }
+    async function sbDelete(table, id) {
+      const { error } = await sb.from(table).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    }
+    async function sbUpsert(table, row, match) {
+      const { data, error } = await sb.from(table).upsert(row, { onConflict: match }).select().single();
+      if (error) throw new Error(error.message);
+      return data;
+    }
+    async function sbUploadImage(bucket, file, path) {
+      const { error } = await sb.storage.from(bucket).upload(path, file, { upsert: true, contentType: file.type });
+      if (error) throw new Error(error.message);
+      const { data } = sb.storage.from(bucket).getPublicUrl(path);
+      return data.publicUrl;
+    }
 
     /* ── HELPERS ── */
     function assetUrl(src) {
@@ -73,33 +119,215 @@
     }
 
     async function apiFetch(url, opts = {}) {
-      const res = await fetch(url, {
-        ...opts,
-        headers: { 'Content-Type': 'application/json', 'x-admin-token': getStoredToken(), ...opts.headers }
-      });
-      const ct = res.headers.get('content-type') || '';
-      if (!ct.includes('application/json')) {
-        const text = await res.text();
-        throw new Error(`Server error (${res.status}): ${text.slice(0, 200)}`);
+      const method = (opts.method || 'GET').toUpperCase();
+      const body = opts.body ? JSON.parse(opts.body) : null;
+
+      // ── dashboard ──────────────────────────────────────────────────────────
+      if (url === '/api/dashboard') {
+        const [menuItems, specials, gallery, activity, pageViews] = await Promise.all([
+          sbGet('menu_items'),
+          sbGet('daily_specials'),
+          sbGet('media_files', { eq: { usage_type: 'gallery' } }),
+          sbGet('activity_log', { order: 'created_at', asc: false, limit: 10 }),
+          sbGet('page_analytics', { limit: 1000 }),
+        ]);
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const recentViews = pageViews.filter(p => p.visited_at >= sevenDaysAgo);
+        return {
+          totalItems: menuItems.length,
+          availableItems: menuItems.filter(i => i.available).length,
+          activeSpecials: specials.filter(s => s.is_active).length,
+          galleryCount: gallery.length,
+          recentPageViews: recentViews.length,
+          recentActivity: activity,
+        };
       }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Request failed ${res.status}`);
-      return data;
+
+      // ── categories ─────────────────────────────────────────────────────────
+      if (url === '/api/categories' && method === 'GET')
+        return sbGet('categories', { order: 'display_order' });
+      if (url === '/api/categories' && method === 'POST')
+        return sbInsert('categories', { ...body, is_active: true });
+      const catMatch = url.match(/^\/api\/categories\/(.+)$/);
+      if (catMatch) {
+        if (method === 'PUT') return sbUpdate('categories', catMatch[1], body);
+        if (method === 'DELETE') { await sbDelete('categories', catMatch[1]); return {}; }
+      }
+
+      // ── specials ───────────────────────────────────────────────────────────
+      if (url === '/api/specials' && method === 'GET')
+        return sbGet('daily_specials', { order: 'display_order' });
+      if (url === '/api/specials' && method === 'POST')
+        return sbInsert('daily_specials', body);
+      const spMatch = url.match(/^\/api\/specials\/(.+)$/);
+      if (spMatch) {
+        if (method === 'PUT') return sbUpdate('daily_specials', spMatch[1], body);
+        if (method === 'DELETE') { await sbDelete('daily_specials', spMatch[1]); return {}; }
+      }
+
+      // ── menu ───────────────────────────────────────────────────────────────
+      if (url === '/api/menu' && method === 'GET') {
+        const rows = await sbGet('menu_items', { order: 'display_order' });
+        return rows.map(r => ({
+          id: r.id, name: r.name, description: r.description,
+          categoryId: r.category_id || r.category, category: r.category,
+          price: r.price, priceTiers: r.price_tiers || [],
+          image: r.image_url, imageAlt: r.image_alt,
+          available: r.available, seasonal: r.seasonal, featured: r.featured,
+          displayOrder: r.display_order,
+        }));
+      }
+      const menuMatch = url.match(/^\/api\/menu\/(.+)$/);
+      if (menuMatch) {
+        if (method === 'DELETE') { await sbDelete('menu_items', menuMatch[1]); return {}; }
+      }
+
+      // ── gallery ────────────────────────────────────────────────────────────
+      if (url === '/api/gallery' && method === 'GET')
+        return sbGet('media_files', { eq: { usage_type: 'gallery' }, order: 'display_order' });
+      const galMatch = url.match(/^\/api\/gallery\/(.+)$/);
+      if (galMatch) {
+        if (method === 'DELETE') { await sbDelete('media_files', galMatch[1]); return {}; }
+        if (method === 'PATCH') return sbUpdate('media_files', galMatch[1], body);
+      }
+
+      // ── settings ───────────────────────────────────────────────────────────
+      if (url === '/api/settings' && method === 'GET') {
+        const { data, error } = await sb.from('site_settings').select('*').maybeSingle();
+        if (error) throw new Error(error.message);
+        return data || {};
+      }
+      if (url === '/api/settings' && method === 'PUT') {
+        const { data: existing } = await sb.from('site_settings').select('id').maybeSingle();
+        if (existing?.id) return sbUpdate('site_settings', existing.id, { ...body, updated_at: new Date().toISOString() });
+        return sbInsert('site_settings', body);
+      }
+
+      // ── sections ───────────────────────────────────────────────────────────
+      if (url === '/api/sections' && method === 'GET')
+        return sbGet('website_sections', { order: 'display_order' });
+      const secMatch = url.match(/^\/api\/sections\/(.+)$/);
+      if (secMatch) {
+        if (method === 'PUT') {
+          const { data } = await sb.from('website_sections').select('id').eq('section_key', secMatch[1]).maybeSingle();
+          if (data?.id) return sbUpdate('website_sections', data.id, body);
+          return sbInsert('website_sections', { section_key: secMatch[1], ...body });
+        }
+      }
+
+      // ── analytics ──────────────────────────────────────────────────────────
+      if (url.startsWith('/api/analytics')) {
+        const range = new URLSearchParams(url.split('?')[1]).get('range') || '7d';
+        let since = null;
+        if (range === 'today') since = new Date().toISOString().slice(0, 10);
+        else if (range === '7d') since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        else if (range === '30d') since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        let pvQ = sb.from('page_analytics').select('*');
+        if (since) pvQ = pvQ.gte('visited_at', since);
+        const { data: pvData } = await pvQ;
+        const views = pvData || [];
+        const { data: shares } = await sb.from('social_shares').select('*');
+        const allShares = shares || [];
+        const byDay = {};
+        views.forEach(v => {
+          const d = v.visited_at?.slice(0, 10);
+          if (d) byDay[d] = (byDay[d] || 0) + 1;
+        });
+        const byPage = {};
+        views.forEach(v => { if (v.path) byPage[v.path] = (byPage[v.path] || 0) + 1; });
+        return {
+          totalPageViews: views.length,
+          uniqueVisitors: new Set(views.map(v => v.visitor_id).filter(Boolean)).size,
+          totalShares: allShares.length,
+          fbShares: allShares.filter(s => s.platform === 'facebook').length,
+          waShares: allShares.filter(s => s.platform === 'whatsapp').length,
+          trafficByDay: Object.entries(byDay).sort(([a],[b]) => a.localeCompare(b)).map(([date, count]) => ({ date, count })),
+          topPages: Object.entries(byPage).sort(([,a],[,b]) => b-a).slice(0,10).map(([path, count]) => ({ path, count })),
+        };
+      }
+
+      // ── users ──────────────────────────────────────────────────────────────
+      if (url === '/api/users' && method === 'GET')
+        return sbGet('admin_user_profiles', { order: 'created_at' });
+      if (url === '/api/users' && method === 'POST')
+        return sbInsert('admin_user_profiles', body);
+      const userMatch = url.match(/^\/api\/users\/(.+)$/);
+      if (userMatch) {
+        if (method === 'PUT') return sbUpdate('admin_user_profiles', userMatch[1], body);
+        if (method === 'DELETE') { await sbDelete('admin_user_profiles', userMatch[1]); return {}; }
+      }
+
+      throw new Error(`Unhandled API route: ${method} ${url}`);
     }
 
     async function apiFormFetch(url, opts = {}) {
-      const res = await fetch(url, {
-        ...opts,
-        headers: { 'x-admin-token': getStoredToken(), ...opts.headers }
-      });
-      const ct = res.headers.get('content-type') || '';
-      if (!ct.includes('application/json')) {
-        const text = await res.text();
-        throw new Error(`Server error (${res.status}): ${text.slice(0, 200)}`);
+      const method = (opts.method || 'POST').toUpperCase();
+      const fd = opts.body;
+
+      // ── menu create/update ─────────────────────────────────────────────────
+      if (url === '/api/menu' && method === 'POST') {
+        const imageFile = fd.get('image');
+        let image_url = fd.get('existingImage') || '';
+        if (imageFile && imageFile.size > 0) {
+          const ext = imageFile.name.split('.').pop() || 'jpg';
+          image_url = await sbUploadImage('images', imageFile, `menu/${Date.now()}.${ext}`);
+        }
+        const row = {
+          name: fd.get('name'), description: fd.get('description'),
+          category: fd.get('categoryId'), category_id: fd.get('categoryId'),
+          price: fd.get('price'), price_tiers: JSON.parse(fd.get('priceTiers') || '[]'),
+          image_url, image_alt: fd.get('imageAlt'),
+          available: fd.get('available') === 'true', seasonal: fd.get('seasonal') === 'true',
+          featured: fd.get('featured') === 'true', display_order: parseInt(fd.get('displayOrder') || '0'),
+          usage_type: 'menu',
+        };
+        const created = await sbInsert('menu_items', row);
+        return { ...created, categoryId: created.category_id, image: created.image_url, priceTiers: created.price_tiers || [] };
       }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Request failed ${res.status}`);
-      return data;
+      const menuMatch = url.match(/^\/api\/menu\/(.+)$/);
+      if (menuMatch && (method === 'PUT' || method === 'PATCH')) {
+        const imageFile = fd.get('image');
+        let image_url = fd.get('existingImage') || '';
+        if (imageFile && imageFile.size > 0) {
+          const ext = imageFile.name.split('.').pop() || 'jpg';
+          image_url = await sbUploadImage('images', imageFile, `menu/${Date.now()}.${ext}`);
+        }
+        const changes = {
+          name: fd.get('name'), description: fd.get('description'),
+          category: fd.get('categoryId'), category_id: fd.get('categoryId'),
+          price: fd.get('price'), price_tiers: JSON.parse(fd.get('priceTiers') || '[]'),
+          image_url: image_url || undefined, image_alt: fd.get('imageAlt'),
+          available: fd.get('available') === 'true', seasonal: fd.get('seasonal') === 'true',
+          featured: fd.get('featured') === 'true', display_order: parseInt(fd.get('displayOrder') || '0'),
+        };
+        if (!image_url) delete changes.image_url;
+        const updated = await sbUpdate('menu_items', menuMatch[1], changes);
+        return { ...updated, categoryId: updated.category_id, image: updated.image_url, priceTiers: updated.price_tiers || [] };
+      }
+
+      // ── gallery upload ─────────────────────────────────────────────────────
+      if (url === '/api/gallery' && method === 'POST') {
+        const photoFile = fd.get('photo');
+        if (!photoFile || photoFile.size === 0) throw new Error('No photo selected');
+        const ext = photoFile.name.split('.').pop() || 'jpg';
+        const image_url = await sbUploadImage('images', photoFile, `gallery/${Date.now()}.${ext}`);
+        return sbInsert('media_files', {
+          file_name: photoFile.name, file_url: image_url, file_type: 'image',
+          caption: fd.get('caption') || '', alt_text: fd.get('caption') || '',
+          usage_type: 'gallery', display_order: 0,
+        });
+      }
+
+      // ── hero image upload ──────────────────────────────────────────────────
+      if (url === '/api/settings/hero-image' && method === 'POST') {
+        const imageFile = fd.get('image');
+        if (!imageFile || imageFile.size === 0) throw new Error('No image selected');
+        const ext = imageFile.name.split('.').pop() || 'jpg';
+        const publicUrl = await sbUploadImage('images', imageFile, `hero/${Date.now()}.${ext}`);
+        return { image: publicUrl };
+      }
+
+      throw new Error(`Unhandled form route: ${method} ${url}`);
     }
 
     /* ── TOAST ── */
@@ -1617,14 +1845,8 @@
       const [auth, setAuth] = useState(null);
 
       useEffect(() => {
-        if (getStoredToken() === ADMIN_TOKEN) { setAuth(true); return; }
-        fetch('/api/auth/status')
-          .then(r => r.json())
-          .then(d => {
-            if (d.authenticated) { if (d.token) localStorage.setItem(STORE_KEY, d.token); setAuth(true); }
-            else window.location.replace('/admin/login');
-          })
-          .catch(() => window.location.replace('/admin/login'));
+        if (getStoredToken() === ADMIN_TOKEN) { setAuth(true); }
+        else window.location.replace('/admin/login');
       }, []);
 
       if (auth === null) return <div className="init-loading"><div className="spinner"></div></div>;
