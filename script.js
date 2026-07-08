@@ -4,6 +4,7 @@ const lightboxImage = document.querySelector('.lightbox img');
 const lightboxClose = document.querySelector('.lightbox-close');
 const currentYear = document.querySelector('[data-current-year]');
 const backToTop = document.querySelector('.back-to-top');
+const MENU_IMAGE_FALLBACK = 'images/menu-photo-unavailable.svg';
 
 if (currentYear) currentYear.textContent = new Date().getFullYear();
 
@@ -96,12 +97,11 @@ async function renderMenu() {
       const seasonal = item.seasonal
         ? '<span class="seasonal-badge" style="display:inline-block;padding:2px 8px;background:#fff3e8;color:#f36c13;border-radius:999px;font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;margin-top:4px">Seasonal</span>'
         : '';
-      const img = item.image
-        ? `<img src="${escHtml(assetUrl(item.image))}" alt="${escHtml(item.imageAlt || item.name)}" loading="lazy">`
-        : '';
+      const imgSrc = assetUrl(item.image || MENU_IMAGE_FALLBACK);
+      const imgAlt = item.image ? (item.imageAlt || item.name) : 'Photo Unavailable';
       return `
         <article class="plate-card" data-menu-category="${escHtml(item.category)}">
-          ${img}
+          <img src="${escHtml(imgSrc)}" alt="${escHtml(imgAlt)}" loading="lazy" class="${item.image ? '' : 'menu-fallback-image'}">
           <div>
             <h3>${escHtml(item.name)}</h3>
             ${item.description ? `<p>${escHtml(item.description)}</p>` : ''}

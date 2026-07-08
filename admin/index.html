@@ -22,6 +22,7 @@
     /* ── AUTH HELPERS ── */
     const ADMIN_TOKEN = btoa('admin:password123');
     const STORE_KEY = 'bbcAdminToken';
+    const MENU_IMAGE_FALLBACK = '/images/menu-photo-unavailable.svg';
     function getStoredToken() { return localStorage.getItem(STORE_KEY) || ''; }
     function clearStoredToken() { localStorage.removeItem(STORE_KEY); }
 
@@ -545,10 +546,12 @@
             <div className="menu-grid">
               {filtered.map(item => (
                 <div key={item.id} className="menu-card" style={{ opacity: item.available ? 1 : 0.6 }}>
-                  {item.image
-                    ? <img className="menu-card-image" src={assetUrl(item.image)} alt={item.imageAlt || item.name} loading="lazy" />
-                    : <div className="menu-card-image-placeholder">🍽</div>
-                  }
+                  <img
+                    className={`menu-card-image${item.image ? '' : ' menu-card-image-fallback'}`}
+                    src={item.image ? assetUrl(item.image) : MENU_IMAGE_FALLBACK}
+                    alt={item.imageAlt || item.name || 'Photo Unavailable'}
+                    loading="lazy"
+                  />
                   <div className="menu-card-body">
                     <div className="menu-card-name">{item.name}</div>
                     {item.description && <div className="menu-card-desc">{item.description}</div>}

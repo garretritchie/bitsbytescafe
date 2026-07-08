@@ -644,6 +644,11 @@ main {
   transition: transform 260ms ease, filter 260ms ease;
 }
 
+.plate-card img.menu-fallback-image {
+  object-fit: cover;
+  background: #fffaf2;
+}
+
 .plate-card div {
   padding: 10px 12px 4px;
 }
