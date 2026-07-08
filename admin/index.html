@@ -46,6 +46,26 @@
       return `/${src.replace(/^\/+/, '')}`;
     }
 
+    function sortMenuItemsForDisplay(items) {
+      const categoryOrder = new Map();
+      items.forEach((item) => {
+        if (!categoryOrder.has(item.category)) categoryOrder.set(item.category, categoryOrder.size);
+      });
+
+      return items
+        .map((item, index) => ({ item, index }))
+        .sort((a, b) => {
+          const categoryDiff = categoryOrder.get(a.item.category) - categoryOrder.get(b.item.category);
+          if (categoryDiff !== 0) return categoryDiff;
+
+          const photoDiff = Number(Boolean(b.item.image)) - Number(Boolean(a.item.image));
+          if (photoDiff !== 0) return photoDiff;
+
+          return a.index - b.index;
+        })
+        .map(({ item }) => item);
+    }
+
     async function apiFetch(url, opts = {}) {
       const res = await fetch(url, {
         ...opts,
@@ -477,12 +497,12 @@
         }
       }
 
-      const filtered = items.filter(item => {
+      const filtered = sortMenuItemsForDisplay(items.filter(item => {
         const matchSearch = !search || item.name.toLowerCase().includes(search.toLowerCase());
         const matchCat = filterCat === 'all' || item.category === filterCat;
         const matchSeasonal = filterSeasonal === 'all' || (filterSeasonal === 'yes' ? item.seasonal : !item.seasonal);
         return matchSearch && matchCat && matchSeasonal;
-      });
+      }));
 
       const stats = {
         total: items.length,

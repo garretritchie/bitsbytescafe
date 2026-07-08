@@ -61,6 +61,26 @@ function assetUrl(src) {
   return src.replace(/^\/+/, '');
 }
 
+function sortMenuItemsForDisplay(items) {
+  const categoryOrder = new Map();
+  items.forEach((item) => {
+    if (!categoryOrder.has(item.category)) categoryOrder.set(item.category, categoryOrder.size);
+  });
+
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const categoryDiff = categoryOrder.get(a.item.category) - categoryOrder.get(b.item.category);
+      if (categoryDiff !== 0) return categoryDiff;
+
+      const photoDiff = Number(Boolean(b.item.image)) - Number(Boolean(a.item.image));
+      if (photoDiff !== 0) return photoDiff;
+
+      return a.index - b.index;
+    })
+    .map(({ item }) => item);
+}
+
 /* ── MENU FILTER ── */
 function setupMenuFilter() {
   const filterButtons = document.querySelectorAll('[data-menu-filter]');
@@ -85,7 +105,7 @@ async function renderMenu() {
 
   try {
     const items = await fetchJson('/api/menu', '/data/menu.json');
-    const visible = items.filter(i => i.available);
+    const visible = sortMenuItemsForDisplay(items.filter(i => i.available));
 
     if (visible.length === 0) {
       grid.innerHTML = '<p style="color:#62666d;font-size:0.9rem;padding:16px 0">Menu coming soon.</p>';
