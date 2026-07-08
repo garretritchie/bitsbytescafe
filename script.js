@@ -106,14 +106,14 @@ function formatPrice(item) {
   return item.price || '';
 }
 
-async function fetchJson(primaryUrl, fallbackUrl) {
+async function fetchJson(staticUrl, apiUrl) {
   try {
-    const res = await fetch(primaryUrl);
+    const res = await fetch(staticUrl, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Request failed ${res.status}`);
     return await res.json();
   } catch {
-    const res = await fetch(fallbackUrl);
-    if (!res.ok) throw new Error(`Fallback failed ${res.status}`);
+    const res = await fetch(apiUrl, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`API fallback failed ${res.status}`);
     return res.json();
   }
 }
@@ -249,7 +249,7 @@ async function renderMenu() {
   if (!grid) return;
 
   try {
-    const items = await fetchJson('/api/menu', '/data/menu.json');
+    const items = await fetchJson('/data/menu.json', '/api/menu');
     const visible = sortMenuItemsForDisplay(items.filter(i => i.available));
 
     if (visible.length === 0) {
@@ -302,7 +302,7 @@ async function renderGallery() {
   if (!grid) return;
 
   try {
-    const items = await fetchJson('/api/gallery', '/data/gallery.json');
+    const items = await fetchJson('/data/gallery.json', '/api/gallery');
 
     if (items.length === 0) {
       grid.innerHTML = '';
