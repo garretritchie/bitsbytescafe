@@ -44,8 +44,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Veggie saute breakfast"
+    "image": "images/472424922_2088926098246245_4451412316723871727_n.jpg",
+    "imageAlt": "Veggie saute with mushrooms, peppers, and potatoes"
   },
   {
     "id": "official-breakfast-005",
@@ -116,8 +116,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Ham and cheese sandwich"
+    "image": "images/53465065_627099024428967_6966460533482455040_n.jpg",
+    "imageAlt": "Cafe sandwich with fresh lettuce and tomato"
   },
   {
     "id": "official-sandwich-003",
@@ -128,8 +128,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Turkey and cheese sandwich"
+    "image": "images/53465065_627099024428967_6966460533482455040_n.jpg",
+    "imageAlt": "Cafe sandwich with fresh lettuce and tomato"
   },
   {
     "id": "official-sandwich-004",
@@ -140,8 +140,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "BLT sandwich"
+    "image": "images/53465065_627099024428967_6966460533482455040_n.jpg",
+    "imageAlt": "Cafe sandwich with fresh lettuce and tomato"
   },
   {
     "id": "official-sandwich-005",
@@ -152,8 +152,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Cheese sub"
+    "image": "images/74362777_794115474393987_263834708507361280_n.jpg",
+    "imageAlt": "Cafe wrap with greens and fries"
   },
   {
     "id": "official-sandwich-006",
@@ -164,8 +164,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Club sandwich"
+    "image": "images/74362777_794115474393987_263834708507361280_n.jpg",
+    "imageAlt": "Cafe wrap with greens and fries"
   },
   {
     "id": "official-sandwich-007",
@@ -188,8 +188,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Curry wrap"
+    "image": "images/74362777_794115474393987_263834708507361280_n.jpg",
+    "imageAlt": "Cafe wrap with greens and fries"
   },
   {
     "id": "official-sandwich-009",
@@ -200,8 +200,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Turkey bacon and cheese sub"
+    "image": "images/74362777_794115474393987_263834708507361280_n.jpg",
+    "imageAlt": "Cafe wrap with greens and fries"
   },
   {
     "id": "official-sandwich-010",
@@ -212,8 +212,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Salmon and Swiss"
+    "image": "images/73323907_780714709067397_4621525758437752832_n.jpg",
+    "imageAlt": "Salmon plate with fresh salad"
   },
   {
     "id": "official-sandwich-011",
@@ -224,8 +224,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Veggie mushroom"
+    "image": "images/472424922_2088926098246245_4451412316723871727_n.jpg",
+    "imageAlt": "Veggie mushroom saute with fresh vegetables"
   },
   {
     "id": "official-sandwich-012",
@@ -248,8 +248,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Veggie burger"
+    "image": "images/53465065_627099024428967_6966460533482455040_n.jpg",
+    "imageAlt": "Cafe burger with lettuce and tomato"
   },
   {
     "id": "official-wings-004",
@@ -320,8 +320,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Curry chicken plate"
+    "image": "images/72997009_780279165777618_8469087702782836736_n.jpg",
+    "imageAlt": "Curry chicken plate with plantains and slaw"
   },
   {
     "id": "official-lunch-003",
@@ -332,8 +332,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Chicken saute dinner"
+    "image": "images/472424922_2088926098246245_4451412316723871727_n.jpg",
+    "imageAlt": "Chicken saute with vegetables"
   },
   {
     "id": "official-lunch-004",
@@ -344,8 +344,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Porkchop dinner"
+    "image": "images/79174246_810219642783570_6291102893558726656_n.jpg",
+    "imageAlt": "Lunch plate with meat, rice, macaroni, and potato salad"
   },
   {
     "id": "official-lunch-005",
@@ -356,8 +356,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Ribs dinner"
+    "image": "images/73323907_780714709067397_4621525758437752832_n.jpg",
+    "imageAlt": "Ribs dinner with garden salad"
   },
   {
     "id": "official-lunch-006",
@@ -368,8 +368,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Lamb chop dinner"
+    "image": "images/79174246_810219642783570_6291102893558726656_n.jpg",
+    "imageAlt": "Lunch plate with meat, rice, macaroni, and potato salad"
   },
   {
     "id": "official-lunch-007",
@@ -380,8 +380,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Curry chickpea"
+    "image": "images/72997009_780279165777618_8469087702782836736_n.jpg",
+    "imageAlt": "Curry plate with vegetables and plantains"
   },
   {
     "id": "official-lunch-008",
@@ -392,8 +392,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Veggie saute dinner"
+    "image": "images/472424922_2088926098246245_4451412316723871727_n.jpg",
+    "imageAlt": "Veggie saute with mushrooms, peppers, and potatoes"
   },
   {
     "id": "official-lunch-009",
@@ -404,8 +404,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Fish dinner"
+    "image": "images/77104280_810219676116900_2484615452337111040_n.jpg",
+    "imageAlt": "Fried fish dinner with rice and sides"
   },
   {
     "id": "official-lunch-010",
@@ -416,8 +416,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Sweet chili salmon dinner"
+    "image": "images/73323907_780714709067397_4621525758437752832_n.jpg",
+    "imageAlt": "Salmon dinner with fresh salad"
   },
   {
     "id": "official-lunch-011",
@@ -428,8 +428,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Chicken breast"
+    "image": "images/79174246_810219642783570_6291102893558726656_n.jpg",
+    "imageAlt": "Chicken breast lunch plate"
   },
   {
     "id": "official-lunch-012",
@@ -452,8 +452,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "White rice"
+    "image": "images/156230636_1154810454991152_6184595540112816626_n.jpg",
+    "imageAlt": "White rice served with lunch sides"
   },
   {
     "id": "official-side-002",
@@ -464,8 +464,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Cajun yellow rice"
+    "image": "images/77104280_810219676116900_2484615452337111040_n.jpg",
+    "imageAlt": "Yellow rice served with fish dinner"
   },
   {
     "id": "official-side-003",
@@ -476,8 +476,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Corn and rice"
+    "image": "images/157052930_1155236358281895_2273144132893456408_n.jpg",
+    "imageAlt": "Rice and corn served with lunch plate"
   },
   {
     "id": "official-side-004",
@@ -488,8 +488,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Peas and rice"
+    "image": "images/77371157_810219786116889_1613874059286675456_n.jpg",
+    "imageAlt": "Peas and rice served with lunch plate"
   },
   {
     "id": "official-side-005",
@@ -524,8 +524,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Potato salad"
+    "image": "images/79174246_810219642783570_6291102893558726656_n.jpg",
+    "imageAlt": "Potato salad with lunch plate"
   },
   {
     "id": "official-side-008",
@@ -536,8 +536,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Plantains"
+    "image": "images/72997009_780279165777618_8469087702782836736_n.jpg",
+    "imageAlt": "Golden fried plantains"
   },
   {
     "id": "official-side-009",
@@ -548,8 +548,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Sweet corn"
+    "image": "images/157052930_1155236358281895_2273144132893456408_n.jpg",
+    "imageAlt": "Sweet corn with rice plate"
   },
   {
     "id": "official-side-010",
@@ -572,8 +572,8 @@
     "priceTiers": [],
     "seasonal": false,
     "available": true,
-    "image": "",
-    "imageAlt": "Festival"
+    "image": "images/77104280_810219676116900_2484615452337111040_n.jpg",
+    "imageAlt": "Festival served with fish dinner"
   },
   {
     "id": "official-side-012",

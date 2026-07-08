@@ -296,7 +296,7 @@ console.log('\nBits & Bytes Cafe — CMS seed\n');
 
 // Menu
 const existingMenu = await readJSON(MENU_FILE, []);
-const mergedMenu = mergeById(existingMenu, SEED_MENU);
+const mergedMenu = existingMenu.length ? existingMenu : SEED_MENU;
 await writeJSON(MENU_FILE, mergedMenu);
 console.log(`  ${mergedMenu.length} menu items (${mergedMenu.filter(i => i.available).length} available)`);
 
