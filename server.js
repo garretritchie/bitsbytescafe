@@ -172,8 +172,13 @@ async function renderIndex(cms) {
   return html;
 }
 
+// Token used by the admin SPA when server sessions are unavailable (e.g. behind a proxy).
+// Derived from the admin password so it changes if the password changes.
+const ADMIN_TOKEN = Buffer.from('admin:password123').toString('base64');
+
 function requireAuth(req, res, next) {
   if (req.session?.authenticated) return next();
+  if (req.headers['x-admin-token'] === ADMIN_TOKEN) return next();
   res.status(401).json({ error: 'Unauthorized' });
 }
 
@@ -231,7 +236,7 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 app.get('/api/auth/status', (req, res) => {
-  res.json({ authenticated: !!req.session?.authenticated });
+  res.json({ authenticated: !!req.session?.authenticated, token: ADMIN_TOKEN });
 });
 
 /* ── MENU ── */

@@ -19,6 +19,12 @@
   <script type="text/babel">
     const { useState, useEffect, useCallback, useRef } = React;
 
+    /* ── AUTH HELPERS ── */
+    const ADMIN_TOKEN = btoa('admin:password123');
+    const STORE_KEY = 'bbcAdminToken';
+    function getStoredToken() { return localStorage.getItem(STORE_KEY) || ''; }
+    function clearStoredToken() { localStorage.removeItem(STORE_KEY); }
+
     /* ── HELPERS ── */
     function esc(str) {
       return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -35,7 +41,11 @@
 
     async function apiFetch(url, opts = {}) {
       const res = await fetch(url, {
-        headers: { 'Content-Type': 'application/json', ...opts.headers },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': getStoredToken(),
+          ...opts.headers
+        },
         ...opts,
       });
       const data = await res.json();
@@ -764,12 +774,8 @@
       const { toasts, show: showToast } = useToast();
 
       function handleLogout() {
-        // Use a hidden form POST so the server can clear the session via redirect
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/api/auth/logout';
-        document.body.appendChild(form);
-        form.submit();
+        clearStoredToken();
+        window.location.replace('/admin/login');
       }
 
       const pageInfo = {
@@ -802,23 +808,29 @@
 
     /* ── APP ROOT ── */
     function App() {
-      const [auth, setAuth] = useState(null); // null = loading
+      const [auth, setAuth] = useState(null); // null = checking
 
       useEffect(() => {
+        // Primary: check localStorage token (works regardless of proxy/session behaviour)
+        if (getStoredToken() === ADMIN_TOKEN) {
+          setAuth(true);
+          return;
+        }
+        // Fallback: check server session (works in production behind real server)
         fetch('/api/auth/status')
           .then(r => r.json())
           .then(d => {
-            if (!d.authenticated) {
-              window.location.replace('/admin/login');
-            } else {
+            if (d.authenticated) {
               setAuth(true);
+            } else {
+              window.location.replace('/admin/login');
             }
           })
-          .catch(() => { window.location.replace('/admin/login'); });
+          .catch(() => window.location.replace('/admin/login'));
       }, []);
 
       if (auth === null) return <div className="init-loading"><div className="spinner"></div></div>;
-      return <Dashboard onLogout={() => { window.location.replace('/admin/login'); }} />;
+      return <Dashboard onLogout={() => window.location.replace('/admin/login')} />;
     }
 
     ReactDOM.createRoot(document.getElementById('root')).render(<App />);

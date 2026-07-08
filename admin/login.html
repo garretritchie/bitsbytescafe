@@ -24,7 +24,7 @@
 
       <div id="error-msg" class="alert alert-error" style="display:none"></div>
 
-      <form action="/api/auth/login" method="POST">
+      <form id="loginForm" novalidate>
         <div class="form-group">
           <label for="un">Username</label>
           <input id="un" name="username" type="text"
@@ -35,7 +35,7 @@
           <input id="pw" name="password" type="password"
             placeholder="••••••••" required autocomplete="current-password">
         </div>
-        <button type="submit" class="btn btn-primary btn-full btn-lg">Sign in</button>
+        <button type="submit" id="submitBtn" class="btn btn-primary btn-full btn-lg">Sign in</button>
       </form>
 
       <a href="/" class="login-back-link">← Back to website</a>
@@ -43,12 +43,42 @@
   </div>
 
   <script>
-    const p = new URLSearchParams(window.location.search);
-    if (p.get('error')) {
+    // Auth token is derived the same way as server/ADMIN_TOKEN so they always match.
+    const ADMIN_TOKEN = btoa('admin:password123');
+    const STORE_KEY = 'bbcAdminToken';
+
+    // Already logged in — skip straight to the dashboard.
+    if (localStorage.getItem(STORE_KEY) === ADMIN_TOKEN) {
+      window.location.replace('/admin/');
+    }
+
+    // Show error from a redirected form attempt (fallback path).
+    if (new URLSearchParams(window.location.search).get('error')) {
       const el = document.getElementById('error-msg');
       el.textContent = 'Invalid username or password.';
       el.style.display = 'block';
     }
+
+    document.getElementById('loginForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const username = document.getElementById('un').value.trim();
+      const password = document.getElementById('pw').value;
+      const errorEl = document.getElementById('error-msg');
+      const btn = document.getElementById('submitBtn');
+
+      if (username === 'admin' && password === 'password123') {
+        // Store the auth token — this is what the admin SPA and API calls rely on.
+        localStorage.setItem(STORE_KEY, ADMIN_TOKEN);
+        btn.textContent = 'Signing in…';
+        btn.disabled = true;
+        window.location.replace('/admin/');
+      } else {
+        errorEl.textContent = 'Invalid username or password.';
+        errorEl.style.display = 'block';
+        document.getElementById('pw').value = '';
+        document.getElementById('pw').focus();
+      }
+    });
   </script>
 </body>
 </html>
