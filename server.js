@@ -18,13 +18,14 @@ await mkdir(DATA_DIR, { recursive: true });
 await mkdir(UPLOADS_DIR, { recursive: true });
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'bbc-cms-local-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 8 * 60 * 60 * 1000 }
+  cookie: { maxAge: 8 * 60 * 60 * 1000, sameSite: 'lax' }
 }));
 
 // Static files — explicitly scoped to avoid exposing .env and server source
@@ -210,18 +211,30 @@ app.get('/preview', async (req, res) => {
 });
 
 /* ── AUTH ── */
+// Handles both plain form POST (redirects) and fetch (JSON), so login works
+// regardless of whether the proxy intercepts fetch requests.
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
+  const wantsJson = req.headers.accept?.includes('application/json') ||
+                    req.headers['content-type']?.includes('application/json');
   if (username === 'admin' && password === 'password123') {
     req.session.authenticated = true;
-    res.json({ ok: true });
+    req.session.save(() => {
+      if (wantsJson) return res.json({ ok: true });
+      res.redirect('/admin/');
+    });
   } else {
-    res.status(401).json({ error: 'Invalid username or password' });
+    if (wantsJson) return res.status(401).json({ error: 'Invalid username or password' });
+    res.redirect('/admin/?error=1');
   }
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  req.session.destroy(() => res.json({ ok: true }));
+  req.session.destroy(() => {
+    const wantsJson = req.headers.accept?.includes('application/json');
+    if (wantsJson) return res.json({ ok: true });
+    res.redirect('/admin/');
+  });
 });
 
 app.get('/api/auth/status', (req, res) => {

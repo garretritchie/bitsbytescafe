@@ -97,28 +97,40 @@
     function Login({ onLogin }) {
       const [username, setUsername] = useState('');
       const [password, setPassword] = useState('');
-      const [error, setError] = useState('');
+      const [error, setError] = useState(() => {
+        const p = new URLSearchParams(window.location.search);
+        return p.get('error') ? 'Invalid username or password.' : '';
+      });
       const [loading, setLoading] = useState(false);
+      const formRef = React.useRef();
 
       async function handleSubmit(e) {
         e.preventDefault();
         setLoading(true);
         setError('');
         try {
-          // Use URLSearchParams so the request is form-encoded — avoids proxy issues
           const body = new URLSearchParams({ username, password });
           const res = await fetch('/api/auth/login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
             body: body.toString(),
+            credentials: 'same-origin',
           });
-          let data;
-          try { data = await res.json(); } catch { data = {}; }
-          if (!res.ok) throw new Error(data.error || 'Invalid username or password');
+          // If fetch is intercepted and returns non-JSON, fall back to native form POST
+          const ct = res.headers.get('content-type') || '';
+          if (!ct.includes('application/json')) {
+            formRef.current.submit();
+            return;
+          }
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Invalid username or password.');
           onLogin();
         } catch (err) {
+          if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+            formRef.current.submit();
+            return;
+          }
           setError(err.message);
-        } finally {
           setLoading(false);
         }
       }
@@ -135,15 +147,18 @@
             <h1>Admin Panel</h1>
             <p className="login-sub">Sign in to manage your restaurant content</p>
             {error && <div className="alert alert-error">{error}</div>}
-            <form onSubmit={handleSubmit}>
+            {/* Native form for fallback — action points to the redirect-capable server route */}
+            <form ref={formRef} action="/api/auth/login" method="POST" onSubmit={handleSubmit}>
               <div className="form-group">
                 <label htmlFor="un">Username</label>
-                <input id="un" type="text" value={username} onChange={e => setUsername(e.target.value)}
+                <input id="un" name="username" type="text" value={username}
+                  onChange={e => setUsername(e.target.value)}
                   placeholder="Username" required autoFocus autoComplete="username" />
               </div>
               <div className="form-group">
                 <label htmlFor="pw">Password</label>
-                <input id="pw" type="password" value={password} onChange={e => setPassword(e.target.value)}
+                <input id="pw" name="password" type="password" value={password}
+                  onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••" required autoComplete="current-password" />
               </div>
               <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
