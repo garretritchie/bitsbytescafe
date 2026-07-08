@@ -835,13 +835,17 @@
       async function toggleAvailable(item) {
         try {
           const fd = new FormData();
-          Object.entries(item).forEach(([k, v]) => {
-            if (k === 'available') fd.append(k, !item.available);
-            else if (k === 'priceTiers') fd.append(k, JSON.stringify(v));
-            else if (k === 'categoryId') fd.append(k, v);
-            else if (k !== 'image') fd.append(k, v ?? '');
-          });
+          fd.append('name',          item.name || '');
+          fd.append('description',   item.description || '');
+          fd.append('categoryId',    item.categoryId || '');
+          fd.append('price',         item.price || '');
+          fd.append('priceTiers',    JSON.stringify(item.priceTiers || []));
+          fd.append('imageAlt',      item.imageAlt || item.name || '');
           fd.append('existingImage', item.image || '');
+          fd.append('available',     !item.available);
+          fd.append('seasonal',      item.seasonal || false);
+          fd.append('featured',      item.featured || false);
+          fd.append('displayOrder',  item.displayOrder || 0);
           const updated = await apiFormFetch(`/api/menu/${item.id}`, { method: 'PUT', body: fd });
           setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
           showToast(updated.available ? 'Item visible' : 'Item hidden');

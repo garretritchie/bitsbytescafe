@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js",
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "seed": "node scripts/seed.js"
   },
   "devDependencies": {
     "serve": "^14.2.6"
