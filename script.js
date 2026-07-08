@@ -16,7 +16,7 @@ const CATEGORY_LABELS = {
   'breakfast': 'Breakfast',
   'sandwiches-wraps-burgers': 'Sandwiches, Wraps & Burgers',
   'chicken-wings': 'Chicken Wings',
-  'lunch-dinner-plates': 'Lunch & Dinner Plates',
+  'lunch': 'Lunch',
   'sides-salads': 'Sides & Salads',
   'other': 'Other'
 };
