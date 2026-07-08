@@ -47,12 +47,25 @@
 
     async function apiFetch(url, opts = {}) {
       const res = await fetch(url, {
+        ...opts,
         headers: {
           'Content-Type': 'application/json',
           'x-admin-token': getStoredToken(),
           ...opts.headers
-        },
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Request failed ${res.status}`);
+      return data;
+    }
+
+    async function apiFormFetch(url, opts = {}) {
+      const res = await fetch(url, {
         ...opts,
+        headers: {
+          'x-admin-token': getStoredToken(),
+          ...opts.headers
+        }
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Request failed ${res.status}`);
@@ -418,13 +431,11 @@
         setSaving(true);
         try {
           if (modal === 'add') {
-            const created = await fetch('/api/menu', { method: 'POST', body: fd }).then(r => r.json());
-            if (created.error) throw new Error(created.error);
+            const created = await apiFormFetch('/api/menu', { method: 'POST', body: fd });
             setItems(prev => [...prev, created]);
             showToast('Menu item added');
           } else {
-            const updated = await fetch(`/api/menu/${modal.id}`, { method: 'PUT', body: fd }).then(r => r.json());
-            if (updated.error) throw new Error(updated.error);
+            const updated = await apiFormFetch(`/api/menu/${modal.id}`, { method: 'PUT', body: fd });
             setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
             showToast('Menu item updated');
           }
@@ -457,7 +468,7 @@
             else if (k !== 'image') fd.append(k, v);
           });
           fd.append('existingImage', item.image || '');
-          const updated = await fetch(`/api/menu/${item.id}`, { method: 'PUT', body: fd }).then(r => r.json());
+          const updated = await apiFormFetch(`/api/menu/${item.id}`, { method: 'PUT', body: fd });
           setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
           showToast(updated.available ? 'Item is now visible' : 'Item hidden from menu');
         } catch (err) {
@@ -644,8 +655,7 @@
           const fd = new FormData();
           fd.append('photo', pendingFile);
           fd.append('caption', pendingCaption);
-          const created = await fetch('/api/gallery', { method: 'POST', body: fd }).then(r => r.json());
-          if (created.error) throw new Error(created.error);
+          const created = await apiFormFetch('/api/gallery', { method: 'POST', body: fd });
           setItems(prev => [...prev, created]);
           showToast('Photo uploaded');
           cancelUpload();
@@ -846,6 +856,7 @@
           .then(r => r.json())
           .then(d => {
             if (d.authenticated) {
+              if (d.token) localStorage.setItem(STORE_KEY, d.token);
               setAuth(true);
             } else {
               window.location.replace('/admin/login');
