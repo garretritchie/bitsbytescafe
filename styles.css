@@ -622,7 +622,19 @@ main {
   box-shadow:
     0 18px 36px rgba(82, 52, 20, 0.09),
     0 3px 10px rgba(82, 52, 20, 0.05);
+  cursor: pointer;
   transition: transform 190ms ease, box-shadow 190ms ease, border-color 190ms ease;
+}
+
+.plate-card:focus-visible {
+  outline: 3px solid rgba(243, 108, 19, 0.32);
+  outline-offset: 4px;
+}
+
+.plate-card-details {
+  color: var(--orange);
+  font-size: 0.75rem;
+  font-weight: 850;
 }
 
 .plate-card[hidden] {
@@ -657,14 +669,37 @@ main {
   color: #51565f;
   font-size: 0.78rem;
   line-height: 1.25;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
-.plate-card strong {
-  justify-self: end;
-  padding: 0 12px 12px;
+.plate-card footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 12px 12px;
+}
+
+.plate-card strong,
+.menu-modal-price {
   color: var(--orange);
   font-size: 0.82rem;
-  font-weight: 900;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.plate-card sup,
+.menu-modal-price sup {
+  top: -0.2em;
+  margin-left: 2px;
+  color: #7a7f69;
+  font-size: 0.58em;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .updates-section {
@@ -1029,6 +1064,95 @@ main {
   cursor: pointer;
 }
 
+.menu-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(243, 108, 19, 0.16), transparent 34%),
+    rgba(21, 17, 12, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.menu-modal[hidden] {
+  display: none;
+}
+
+.menu-modal-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.78fr) minmax(0, 1fr);
+  width: min(720px, 94vw);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 18px;
+  background: #fffdf8;
+  box-shadow:
+    0 34px 80px rgba(29, 22, 12, 0.28),
+    0 10px 28px rgba(82, 52, 20, 0.16);
+}
+
+.menu-modal-image {
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+  object-fit: cover;
+  background: #fffaf2;
+}
+
+.menu-modal-content {
+  padding: clamp(22px, 4vw, 36px);
+}
+
+.menu-modal-category {
+  margin: 0 0 10px;
+  color: var(--green);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.menu-modal h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.55rem, 3vw, 2.2rem);
+  line-height: 0.98;
+  font-weight: 950;
+}
+
+.menu-modal-description {
+  margin: 16px 0 22px;
+  color: #4f545c;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.menu-modal-price {
+  display: inline-block;
+  font-size: 1.1rem;
+}
+
+.menu-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(17, 19, 24, 0.1);
+  border-radius: 999px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.86);
+  font-size: 1.45rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(82, 52, 20, 0.14);
+}
+
 .back-to-top {
   position: fixed;
   right: clamp(18px, 3vw, 34px);
@@ -1359,12 +1483,32 @@ main {
     padding: 11px 12px 4px;
   }
 
-  .plate-card strong {
+  .plate-card footer {
     padding-bottom: 13px;
   }
 
   .plate-card p {
     display: none;
+  }
+
+  .menu-modal {
+    padding: 16px;
+  }
+
+  .menu-modal-card {
+    grid-template-columns: 1fr;
+    max-height: 88vh;
+    overflow-y: auto;
+    border-radius: 16px;
+  }
+
+  .menu-modal-image {
+    min-height: 0;
+    height: 190px;
+  }
+
+  .menu-modal-content {
+    padding: 20px;
   }
 
   .gallery-grid {
@@ -1448,12 +1592,6 @@ main {
     transform: translateY(-2px) scale(1.03);
   }
 
-  .section-heading a:hover,
-  .section-heading a:focus-visible {
-    color: var(--orange-dark);
-    transform: translateX(3px);
-  }
-
   .menu-filter button:hover,
   .menu-filter button:focus-visible {
     border-color: rgba(243, 108, 19, 0.38);
@@ -1468,6 +1606,11 @@ main {
       0 24px 48px rgba(82, 52, 20, 0.14),
       0 6px 16px rgba(82, 52, 20, 0.08);
     transform: translateY(-4px);
+  }
+
+  .plate-card:hover .plate-card-details,
+  .plate-card:focus-visible .plate-card-details {
+    color: var(--orange-dark);
   }
 
   .plate-card:hover img,
