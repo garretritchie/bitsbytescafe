@@ -37,7 +37,8 @@ app.get('/script.js', (req, res) => res.sendFile(path.join(__dirname, 'script.js
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.tmp`);
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    cb(null, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
   }
 });
 
@@ -235,7 +236,8 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 app.get('/api/auth/status', (req, res) => {
-  res.json({ authenticated: !!req.session?.authenticated, token: ADMIN_TOKEN });
+  const authenticated = !!req.session?.authenticated;
+  res.json({ authenticated, token: authenticated ? ADMIN_TOKEN : null });
 });
 
 /* ── MENU ── */

@@ -20,6 +20,8 @@ for (const directory of directories) {
 if (existsSync("public/uploads")) {
   await mkdir("dist/uploads", { recursive: true });
   await cp("public/uploads", "dist/uploads", { recursive: true });
+  await mkdir("dist/public/uploads", { recursive: true });
+  await cp("public/uploads", "dist/public/uploads", { recursive: true });
 }
 
 function escH(str) {

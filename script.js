@@ -12,6 +12,7 @@ const menuModalPrice = document.querySelector('.menu-modal-price');
 const currentYear = document.querySelector('[data-current-year]');
 const backToTop = document.querySelector('.back-to-top');
 const MENU_IMAGE_FALLBACK = 'images/menu-photo-unavailable.svg';
+const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 const CATEGORY_LABELS = {
   'breakfast': 'Breakfast',
   'sandwiches-wraps-burgers': 'Sandwiches, Wraps & Burgers',
@@ -40,7 +41,8 @@ function openLightbox(src, alt) {
 
 function closeLightbox() {
   lightbox.hidden = true;
-  lightboxImage.removeAttribute('src');
+  lightboxImage.src = TRANSPARENT_PIXEL;
+  lightboxImage.alt = '';
 }
 
 lightboxClose.addEventListener('click', closeLightbox);
@@ -79,7 +81,8 @@ function openMenuModal(item) {
 
 function closeMenuModal() {
   menuModal.hidden = true;
-  menuModalImage.removeAttribute('src');
+  menuModalImage.src = TRANSPARENT_PIXEL;
+  menuModalImage.alt = '';
 }
 
 menuModalClose.addEventListener('click', closeMenuModal);
