@@ -763,9 +763,13 @@
       const [page, setPage] = useState('menu');
       const { toasts, show: showToast } = useToast();
 
-      async function handleLogout() {
-        try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}
-        onLogout();
+      function handleLogout() {
+        // Use a hidden form POST so the server can clear the session via redirect
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/api/auth/logout';
+        document.body.appendChild(form);
+        form.submit();
       }
 
       const pageInfo = {
@@ -803,13 +807,18 @@
       useEffect(() => {
         fetch('/api/auth/status')
           .then(r => r.json())
-          .then(d => setAuth(d.authenticated))
-          .catch(() => setAuth(false));
+          .then(d => {
+            if (!d.authenticated) {
+              window.location.replace('/admin/login');
+            } else {
+              setAuth(true);
+            }
+          })
+          .catch(() => { window.location.replace('/admin/login'); });
       }, []);
 
       if (auth === null) return <div className="init-loading"><div className="spinner"></div></div>;
-      if (!auth) return <Login onLogin={() => setAuth(true)} />;
-      return <Dashboard onLogout={() => setAuth(false)} />;
+      return <Dashboard onLogout={() => { window.location.replace('/admin/login'); }} />;
     }
 
     ReactDOM.createRoot(document.getElementById('root')).render(<App />);

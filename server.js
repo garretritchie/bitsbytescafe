@@ -178,8 +178,13 @@ function requireAuth(req, res, next) {
 }
 
 /* ── CMS admin page (must be before static middleware) ── */
+app.get('/admin/login', (req, res) => {
+  if (req.session?.authenticated) return res.redirect('/admin/');
+  res.sendFile(path.join(__dirname, 'admin', 'login.html'));
+});
+
 app.get('/admin/cms', (req, res) => {
-  if (!req.session?.authenticated) return res.redirect('/admin/');
+  if (!req.session?.authenticated) return res.redirect('/admin/login');
   res.sendFile(path.join(__dirname, 'admin', 'cms.html'));
 });
 
@@ -211,30 +216,18 @@ app.get('/preview', async (req, res) => {
 });
 
 /* ── AUTH ── */
-// Handles both plain form POST (redirects) and fetch (JSON), so login works
-// regardless of whether the proxy intercepts fetch requests.
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
-  const wantsJson = req.headers.accept?.includes('application/json') ||
-                    req.headers['content-type']?.includes('application/json');
   if (username === 'admin' && password === 'password123') {
     req.session.authenticated = true;
-    req.session.save(() => {
-      if (wantsJson) return res.json({ ok: true });
-      res.redirect('/admin/');
-    });
+    req.session.save(() => res.redirect('/admin/'));
   } else {
-    if (wantsJson) return res.status(401).json({ error: 'Invalid username or password' });
-    res.redirect('/admin/?error=1');
+    res.redirect('/admin/login?error=1');
   }
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  req.session.destroy(() => {
-    const wantsJson = req.headers.accept?.includes('application/json');
-    if (wantsJson) return res.json({ ok: true });
-    res.redirect('/admin/');
-  });
+  req.session.destroy(() => res.redirect('/admin/login'));
 });
 
 app.get('/api/auth/status', (req, res) => {

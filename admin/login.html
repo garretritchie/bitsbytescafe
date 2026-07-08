@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — Bits &amp; Bytes Admin</title>
+  <link rel="icon" href="/images/bits-bytes-logo-circle-cropped.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-bg" aria-hidden="true">
+      <img src="/images/74604694_795940760878125_3195495164743254016_n.jpg" alt="">
+    </div>
+    <div class="login-card">
+      <div class="login-logo">
+        <img src="/images/bits-bytes-logo-wide-cropped.png" alt="Bits and Bytes Cafe">
+      </div>
+      <h1>Admin Panel</h1>
+      <p class="login-sub">Sign in to manage your restaurant content</p>
+
+      <div id="error-msg" class="alert alert-error" style="display:none"></div>
+
+      <form action="/api/auth/login" method="POST">
+        <div class="form-group">
+          <label for="un">Username</label>
+          <input id="un" name="username" type="text"
+            placeholder="Username" required autofocus autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="pw">Password</label>
+          <input id="pw" name="password" type="password"
+            placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full btn-lg">Sign in</button>
+      </form>
+
+      <a href="/" class="login-back-link">← Back to website</a>
+    </div>
+  </div>
+
+  <script>
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('error')) {
+      const el = document.getElementById('error-msg');
+      el.textContent = 'Invalid username or password.';
+      el.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
