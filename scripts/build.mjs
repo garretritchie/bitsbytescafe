@@ -3,6 +3,9 @@ import { existsSync } from "node:fs";
 
 const files = ["styles.css", "script.js"];
 const directories = ["images", "data", "admin"];
+const SITE_URL = (process.env.SITE_URL || "https://bitsbytescafe.com").replace(/\/+$/, "");
+const SEO_TITLE = "Bits and Bytes Cafe | Breakfast, Lunch & Coffee in Nassau";
+const SEO_DESCRIPTION = "Bits and Bytes Cafe serves affordable breakfast, lunch, coffee, wings, sandwiches, burgers, wraps, and daily lunch specials in Nassau, Bahamas.";
 
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist", { recursive: true });
@@ -76,9 +79,128 @@ function toWaMe(phone) {
   return `https://wa.me/${phone.replace(/\D/g, "")}`;
 }
 
+function absoluteUrl(src = "") {
+  if (/^https?:\/\//i.test(src)) return src;
+  return `${SITE_URL}/${String(src).replace(/^\/+/, "")}`;
+}
+
+function openingHoursSpecification(hours) {
+  return hours
+    .filter((h) => !h.closed && h.open && h.close)
+    .map((h) => ({
+      "@type": "OpeningHoursSpecification",
+      dayOfWeek: h.day,
+      opens: h.open,
+      closes: h.close
+    }));
+}
+
+function menuSchema(menu) {
+  const visible = menu.filter((item) => item.available);
+  const categories = [...new Set(visible.map((item) => item.category))];
+
+  return {
+    "@type": "Menu",
+    name: "Bits and Bytes Cafe Menu",
+    hasMenuSection: categories.map((category) => ({
+      "@type": "MenuSection",
+      name: category.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()),
+      hasMenuItem: visible
+        .filter((item) => item.category === category)
+        .slice(0, 20)
+        .map((item) => ({
+          "@type": "MenuItem",
+          name: item.name,
+          description: item.description,
+          image: item.image ? absoluteUrl(item.image) : undefined,
+          offers: {
+            "@type": "Offer",
+            priceCurrency: "BSD",
+            price: String(item.price || "").match(/\d+(?:\.\d{2})?/)?.[0]
+          }
+        }))
+    }))
+  };
+}
+
+function seoHead(cms, menu) {
+  const heroImage = absoluteUrl(cms.hero.image);
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "Restaurant",
+    "@id": `${SITE_URL}/#restaurant`,
+    name: "Bits and Bytes Cafe",
+    url: SITE_URL,
+    image: heroImage,
+    logo: absoluteUrl("images/bits-bytes-logo-wide-cropped.png"),
+    description: SEO_DESCRIPTION,
+    telephone: cms.contact.phone,
+    priceRange: "$",
+    servesCuisine: ["Bahamian", "Breakfast", "Cafe", "Comfort Food"],
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: cms.contact.addressLine1,
+      addressLocality: "Nassau",
+      addressCountry: "BS"
+    },
+    geo: {
+      "@type": "GeoCoordinates",
+      latitude: 25.0743892,
+      longitude: -77.3254307
+    },
+    openingHoursSpecification: openingHoursSpecification(cms.hours),
+    sameAs: [
+      "https://www.facebook.com/bitsbytescafe",
+      "https://www.instagram.com/bitsbytescafe",
+      "https://www.tiktok.com/@bitsandbytes242"
+    ],
+    hasMenu: menuSchema(menu)
+  };
+
+  return `<link rel="canonical" href="${escH(SITE_URL)}/">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#f36c13">
+    <meta property="og:type" content="restaurant">
+    <meta property="og:site_name" content="Bits and Bytes Cafe">
+    <meta property="og:title" content="${escH(SEO_TITLE)}">
+    <meta property="og:description" content="${escH(SEO_DESCRIPTION)}">
+    <meta property="og:url" content="${escH(SITE_URL)}/">
+    <meta property="og:image" content="${escH(heroImage)}">
+    <meta property="og:image:alt" content="Fresh food from Bits and Bytes Cafe in Nassau, Bahamas">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${escH(SEO_TITLE)}">
+    <meta name="twitter:description" content="${escH(SEO_DESCRIPTION)}">
+    <meta name="twitter:image" content="${escH(heroImage)}">
+    <script type="application/ld+json">${JSON.stringify(schema)}</script>`;
+}
+
+function robotsTxt() {
+  return `User-agent: *
+Allow: /
+
+Sitemap: ${SITE_URL}/sitemap.xml
+`;
+}
+
+function sitemapXml() {
+  const today = new Date().toISOString().slice(0, 10);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${SITE_URL}/</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
+`;
+}
+
 const cms = JSON.parse(await readFile("data/cms-data.json", "utf8"));
+const menu = JSON.parse(await readFile("data/menu.json", "utf8"));
 let html = await readFile("index.template.html", "utf8");
 const replacements = {
+  "{{SEO_HEAD}}": seoHead(cms, menu),
   "{{HERO_HEADING}}": escH(cms.hero.heading),
   "{{HERO_HEADING_SPAN}}": escH(cms.hero.headingSpan),
   "{{HERO_SUBHEADING}}": escH(cms.hero.subheading),
@@ -105,3 +227,7 @@ await cp("scripts/seed.mjs", "dist/scripts/seed.mjs");
 await cp("package-lock.json", "dist/package-lock.json");
 await writeFile("index.html", html, "utf8");
 await writeFile("dist/index.html", html, "utf8");
+await writeFile("robots.txt", robotsTxt(), "utf8");
+await writeFile("dist/robots.txt", robotsTxt(), "utf8");
+await writeFile("sitemap.xml", sitemapXml(), "utf8");
+await writeFile("dist/sitemap.xml", sitemapXml(), "utf8");

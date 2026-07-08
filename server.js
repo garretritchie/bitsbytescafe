@@ -13,6 +13,9 @@ const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
 const MENU_FILE = path.join(DATA_DIR, 'menu.json');
 const GALLERY_FILE = path.join(DATA_DIR, 'gallery.json');
 const CMS_FILE = path.join(DATA_DIR, 'cms-data.json');
+const SITE_URL = (process.env.SITE_URL || 'https://bitsbytescafe.com').replace(/\/+$/, '');
+const SEO_TITLE = 'Bits and Bytes Cafe | Breakfast, Lunch & Coffee in Nassau';
+const SEO_DESCRIPTION = 'Bits and Bytes Cafe serves affordable breakfast, lunch, coffee, wings, sandwiches, burgers, wraps, and daily lunch specials in Nassau, Bahamas.';
 
 await mkdir(DATA_DIR, { recursive: true });
 await mkdir(UPLOADS_DIR, { recursive: true });
@@ -31,6 +34,7 @@ app.use(session({
 // Static files — explicitly scoped to avoid exposing .env and server source
 app.use('/images', express.static(path.join(__dirname, 'images')));
 app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/data', express.static(DATA_DIR));
 app.get('/styles.css', (req, res) => res.sendFile(path.join(__dirname, 'styles.css')));
 app.get('/script.js', (req, res) => res.sendFile(path.join(__dirname, 'script.js')));
 
@@ -151,9 +155,128 @@ function toWaMe(phone) {
   return `https://wa.me/${digits}`;
 }
 
+function absoluteUrl(src = '') {
+  if (/^https?:\/\//i.test(src)) return src;
+  return `${SITE_URL}/${String(src).replace(/^\/+/, '')}`;
+}
+
+function openingHoursSpecification(hours) {
+  return hours
+    .filter(h => !h.closed && h.open && h.close)
+    .map(h => ({
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: h.day,
+      opens: h.open,
+      closes: h.close
+    }));
+}
+
+function menuSchema(menu) {
+  const visible = menu.filter(item => item.available);
+  const categories = [...new Set(visible.map(item => item.category))];
+
+  return {
+    '@type': 'Menu',
+    name: 'Bits and Bytes Cafe Menu',
+    hasMenuSection: categories.map(category => ({
+      '@type': 'MenuSection',
+      name: category.replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase()),
+      hasMenuItem: visible
+        .filter(item => item.category === category)
+        .slice(0, 20)
+        .map(item => ({
+          '@type': 'MenuItem',
+          name: item.name,
+          description: item.description,
+          image: item.image ? absoluteUrl(item.image) : undefined,
+          offers: {
+            '@type': 'Offer',
+            priceCurrency: 'BSD',
+            price: String(item.price || '').match(/\d+(?:\.\d{2})?/)?.[0]
+          }
+        }))
+    }))
+  };
+}
+
+function seoHead(cms, menu) {
+  const heroImage = absoluteUrl(cms.hero.image);
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'Restaurant',
+    '@id': `${SITE_URL}/#restaurant`,
+    name: 'Bits and Bytes Cafe',
+    url: SITE_URL,
+    image: heroImage,
+    logo: absoluteUrl('images/bits-bytes-logo-wide-cropped.png'),
+    description: SEO_DESCRIPTION,
+    telephone: cms.contact.phone,
+    priceRange: '$',
+    servesCuisine: ['Bahamian', 'Breakfast', 'Cafe', 'Comfort Food'],
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: cms.contact.addressLine1,
+      addressLocality: 'Nassau',
+      addressCountry: 'BS'
+    },
+    geo: {
+      '@type': 'GeoCoordinates',
+      latitude: 25.0743892,
+      longitude: -77.3254307
+    },
+    openingHoursSpecification: openingHoursSpecification(cms.hours),
+    sameAs: [
+      'https://www.facebook.com/bitsbytescafe',
+      'https://www.instagram.com/bitsbytescafe',
+      'https://www.tiktok.com/@bitsandbytes242'
+    ],
+    hasMenu: menuSchema(menu)
+  };
+
+  return `<link rel="canonical" href="${escH(SITE_URL)}/">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#f36c13">
+    <meta property="og:type" content="restaurant">
+    <meta property="og:site_name" content="Bits and Bytes Cafe">
+    <meta property="og:title" content="${escH(SEO_TITLE)}">
+    <meta property="og:description" content="${escH(SEO_DESCRIPTION)}">
+    <meta property="og:url" content="${escH(SITE_URL)}/">
+    <meta property="og:image" content="${escH(heroImage)}">
+    <meta property="og:image:alt" content="Fresh food from Bits and Bytes Cafe in Nassau, Bahamas">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${escH(SEO_TITLE)}">
+    <meta name="twitter:description" content="${escH(SEO_DESCRIPTION)}">
+    <meta name="twitter:image" content="${escH(heroImage)}">
+    <script type="application/ld+json">${JSON.stringify(schema)}</script>`;
+}
+
+function robotsTxt() {
+  return `User-agent: *
+Allow: /
+
+Sitemap: ${SITE_URL}/sitemap.xml
+`;
+}
+
+function sitemapXml() {
+  const today = new Date().toISOString().slice(0, 10);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${SITE_URL}/</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
+`;
+}
+
 async function renderIndex(cms) {
   let html = await readFile(path.join(__dirname, 'index.template.html'), 'utf8');
+  const menu = await readJSON(MENU_FILE, []);
   const replacements = {
+    '{{SEO_HEAD}}':          seoHead(cms, menu),
     '{{HERO_HEADING}}':      escH(cms.hero.heading),
     '{{HERO_HEADING_SPAN}}': escH(cms.hero.headingSpan),
     '{{HERO_SUBHEADING}}':   escH(cms.hero.subheading),
@@ -195,6 +318,14 @@ app.get('/admin/cms', (req, res) => {
 
 /* ── Static admin ── */
 app.use('/admin', express.static(path.join(__dirname, 'admin')));
+
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send(robotsTxt());
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  res.type('application/xml').send(sitemapXml());
+});
 
 /* ── Landing page (SSR) ── */
 app.get('/', async (req, res) => {
