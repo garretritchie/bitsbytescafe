@@ -216,7 +216,7 @@ app.get('/preview', async (req, res) => {
 });
 
 // ── Auth API ──────────────────────────────────────────────────────────────────
-app.post('/api/auth/login', express.json(), (req, res) => {
+app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body || {};
   if (username === 'admin' && password === 'password123') {
     // Set persistent HTTP-only cookie (works across stateless serverless invocations)
@@ -264,6 +264,16 @@ app.get('/api/auth/status', (req, res) => {
 // ── Config (public, for admin SPA) ──────────────────────────────────────────
 app.get('/api/config', (req, res) => {
   res.json({ supabaseUrl: SUPABASE_URL, supabaseAnonKey: SUPABASE_ANON_KEY });
+});
+
+// ── Health check ────────────────────────────────────────────────────────────
+app.get('/api/health', async (req, res) => {
+  try {
+    const { count, error } = await supabase.from('menu_categories').select('*', { count: 'exact', head: true });
+    res.json({ ok: true, db: error ? 'error' : 'connected', categories: count || 0, supabaseUrl: SUPABASE_URL ? 'set' : 'MISSING' });
+  } catch (err) {
+    res.json({ ok: false, error: err.message, supabaseUrl: SUPABASE_URL ? 'set' : 'MISSING' });
+  }
 });
 
 // ── Dashboard summary ─────────────────────────────────────────────────────────
@@ -815,6 +825,11 @@ async function seedIfEmpty() {
 
 const PORT = process.env.PORT || 3000;
 
+// ── Catch-all for unknown /api routes — always returns JSON, never HTML ─────
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `API route not found: ${req.method} ${req.baseUrl}${req.path}` });
+});
+
 // Global error handler — ensures all unhandled errors return JSON, not HTML
 app.use((err, req, res, next) => {
   console.error('Unhandled route error:', err.message);
@@ -822,7 +837,13 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
+// Startup validation
+if (!SUPABASE_URL) {
+  console.error('WARNING: SUPABASE_URL is not set. Database operations will fail.');
+}
+
 app.listen(PORT, async () => {
   console.log(`Bits & Bytes CMS running on port ${PORT}`);
+  console.log(`Supabase: ${SUPABASE_URL ? 'configured' : 'NOT CONFIGURED'}`);
   await seedIfEmpty();
 });
