@@ -576,14 +576,6 @@ main {
   font-size: 0.9rem;
 }
 
-.section-heading a {
-  color: var(--orange);
-  font-size: 0.88rem;
-  font-weight: 900;
-  text-decoration: none;
-  transition: color 160ms ease, transform 160ms ease;
-}
-
 .menu-filter {
   display: flex;
   flex-wrap: wrap;
