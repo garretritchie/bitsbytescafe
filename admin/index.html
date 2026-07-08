@@ -77,6 +77,11 @@
         ...opts,
         headers: { 'Content-Type': 'application/json', 'x-admin-token': getStoredToken(), ...opts.headers }
       });
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        const text = await res.text();
+        throw new Error(`Server error (${res.status}): ${text.slice(0, 200)}`);
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Request failed ${res.status}`);
       return data;
@@ -87,6 +92,11 @@
         ...opts,
         headers: { 'x-admin-token': getStoredToken(), ...opts.headers }
       });
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        const text = await res.text();
+        throw new Error(`Server error (${res.status}): ${text.slice(0, 200)}`);
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Request failed ${res.status}`);
       return data;

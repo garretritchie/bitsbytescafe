@@ -25,8 +25,8 @@ try {
   }
 } catch {}
 
-await mkdir(DATA_DIR, { recursive: true });
-await mkdir(UPLOADS_DIR, { recursive: true });
+await mkdir(DATA_DIR, { recursive: true }).catch(() => {});
+await mkdir(UPLOADS_DIR, { recursive: true }).catch(() => {});
 
 // ── Supabase ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
@@ -167,9 +167,16 @@ async function renderIndex(cms) {
 // ── Auth ────────────────────────────────────────────────────────────────────
 const ADMIN_TOKEN = Buffer.from('admin:password123').toString('base64');
 
+function getAuthCookie(req) {
+  const raw = req.headers.cookie || '';
+  const match = raw.match(/(?:^|;\s*)bbc_auth=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 function requireAuth(req, res, next) {
   if (req.session?.authenticated) return next();
   if (req.headers['x-admin-token'] === ADMIN_TOKEN) return next();
+  if (getAuthCookie(req) === ADMIN_TOKEN) return next();
   res.status(401).json({ error: 'Unauthorized' });
 }
 
@@ -209,23 +216,49 @@ app.get('/preview', async (req, res) => {
 });
 
 // ── Auth API ──────────────────────────────────────────────────────────────────
-app.post('/api/auth/login', (req, res) => {
-  const { username, password } = req.body;
+app.post('/api/auth/login', express.json(), (req, res) => {
+  const { username, password } = req.body || {};
   if (username === 'admin' && password === 'password123') {
-    req.session.authenticated = true;
-    req.session.save(async () => {
-      await logActivity('admin_login', 'auth', 'admin', 'Admin logged in');
-      res.redirect('/admin/');
-    });
+    // Set persistent HTTP-only cookie (works across stateless serverless invocations)
+    res.setHeader('Set-Cookie', `bbc_auth=${encodeURIComponent(ADMIN_TOKEN)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${8*60*60}`);
+    if (req.session) {
+      req.session.authenticated = true;
+      req.session.save(async () => {
+        await logActivity('admin_login', 'auth', 'admin', 'Admin logged in');
+        // Respond with JSON or redirect depending on caller
+        if (req.headers['content-type']?.includes('application/json')) {
+          res.json({ ok: true });
+        } else {
+          res.redirect('/admin/');
+        }
+      });
+    } else {
+      logActivity('admin_login', 'auth', 'admin', 'Admin logged in').catch(() => {});
+      if (req.headers['content-type']?.includes('application/json')) {
+        res.json({ ok: true });
+      } else {
+        res.redirect('/admin/');
+      }
+    }
   } else {
-    res.redirect('/admin/login?error=1');
+    if (req.headers['content-type']?.includes('application/json')) {
+      res.status(401).json({ error: 'Invalid credentials' });
+    } else {
+      res.redirect('/admin/login?error=1');
+    }
   }
 });
 app.post('/api/auth/logout', (req, res) => {
-  req.session.destroy(() => res.redirect('/admin/login'));
+  res.setHeader('Set-Cookie', 'bbc_auth=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0');
+  if (req.session) {
+    req.session.destroy(() => res.redirect('/admin/login'));
+  } else {
+    res.redirect('/admin/login');
+  }
 });
 app.get('/api/auth/status', (req, res) => {
-  res.json({ authenticated: !!req.session?.authenticated, token: ADMIN_TOKEN });
+  const authenticated = !!req.session?.authenticated || getAuthCookie(req) === ADMIN_TOKEN;
+  res.json({ authenticated, token: ADMIN_TOKEN });
 });
 
 // ── Config (public, for admin SPA) ──────────────────────────────────────────
@@ -785,7 +818,12 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-app.listen(PORT, async () => {
-  console.log(`Bits & Bytes CMS running on port ${PORT}`);
-  await seedIfEmpty();
-});
+export default app;
+
+// Only start HTTP server when run directly (not when imported by Netlify Function)
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  app.listen(PORT, async () => {
+    console.log(`Bits & Bytes CMS running on port ${PORT}`);
+    await seedIfEmpty();
+  });
+}
