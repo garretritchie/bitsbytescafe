@@ -42,6 +42,24 @@ function formatPrice(item) {
   return item.price || '';
 }
 
+async function fetchJson(primaryUrl, fallbackUrl) {
+  try {
+    const res = await fetch(primaryUrl);
+    if (!res.ok) throw new Error(`Request failed ${res.status}`);
+    return await res.json();
+  } catch {
+    const res = await fetch(fallbackUrl);
+    if (!res.ok) throw new Error(`Fallback failed ${res.status}`);
+    return res.json();
+  }
+}
+
+function assetUrl(src) {
+  if (!src) return '';
+  if (/^(https?:|data:|blob:|\/)/.test(src)) return src;
+  return src.replace(/^\/+/, '');
+}
+
 /* ── MENU FILTER ── */
 function setupMenuFilter() {
   const filterButtons = document.querySelectorAll('[data-menu-filter]');
@@ -65,7 +83,7 @@ async function renderMenu() {
   if (!grid) return;
 
   try {
-    const items = await fetch('/api/menu').then(r => r.json());
+    const items = await fetchJson('/api/menu', '/data/menu.json');
     const visible = items.filter(i => i.available);
 
     if (visible.length === 0) {
@@ -79,7 +97,7 @@ async function renderMenu() {
         ? '<span class="seasonal-badge" style="display:inline-block;padding:2px 8px;background:#fff3e8;color:#f36c13;border-radius:999px;font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;margin-top:4px">Seasonal</span>'
         : '';
       const img = item.image
-        ? `<img src="${escHtml(item.image)}" alt="${escHtml(item.imageAlt || item.name)}" loading="lazy">`
+        ? `<img src="${escHtml(assetUrl(item.image))}" alt="${escHtml(item.imageAlt || item.name)}" loading="lazy">`
         : '';
       return `
         <article class="plate-card" data-menu-category="${escHtml(item.category)}">
@@ -105,7 +123,7 @@ async function renderGallery() {
   if (!grid) return;
 
   try {
-    const items = await fetch('/api/gallery').then(r => r.json());
+    const items = await fetchJson('/api/gallery', '/data/gallery.json');
 
     if (items.length === 0) {
       grid.innerHTML = '';
@@ -113,8 +131,8 @@ async function renderGallery() {
     }
 
     grid.innerHTML = items.map(item => `
-      <button type="button" data-photo="${escHtml(item.src)}">
-        <img src="${escHtml(item.src)}" alt="${escHtml(item.caption || 'Bits and Bytes Cafe photo')}" loading="lazy">
+      <button type="button" data-photo="${escHtml(assetUrl(item.src))}">
+        <img src="${escHtml(assetUrl(item.src))}" alt="${escHtml(item.caption || 'Bits and Bytes Cafe photo')}" loading="lazy">
       </button>`).join('');
 
     grid.querySelectorAll('[data-photo]').forEach((btn) => {
