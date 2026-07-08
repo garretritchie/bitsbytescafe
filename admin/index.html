@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bits &amp; Bytes Admin</title>
+  <link rel="icon" href="/images/bits-bytes-logo-circle-cropped.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <div id="root"><div class="init-loading">Loading admin panel…</div></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef } = React;
+
+    /* ── HELPERS ── */
+    function esc(str) {
+      return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function formatPrice(item) {
+      if (item.priceTiers && item.priceTiers.length > 0) {
+        const prices = item.priceTiers.map(t => parseFloat(t.price)).filter(p => !isNaN(p));
+        if (prices.length === 0) return item.price || '';
+        return `from $${Math.min(...prices).toFixed(2)}`;
+      }
+      return item.price || '';
+    }
+
+    async function apiFetch(url, opts = {}) {
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...opts.headers },
+        ...opts,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Request failed ${res.status}`);
+      return data;
+    }
+
+    /* ── TOAST ── */
+    function ToastContainer({ toasts }) {
+      return (
+        <div className="toast-container">
+          {toasts.map(t => (
+            <div key={t.id} className={`toast toast-${t.type}`}>
+              <span className="toast-icon">{t.type === 'success' ? '✓' : '✕'}</span>
+              <span>{t.msg}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    function useToast() {
+      const [toasts, setToasts] = useState([]);
+      const show = useCallback((msg, type = 'success') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, msg, type }]);
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+      }, []);
+      return { toasts, show };
+    }
+
+    /* ── CONFIRM DIALOG ── */
+    function ConfirmDialog({ title, message, onConfirm, onCancel }) {
+      return (
+        <div className="confirm-overlay" onClick={onCancel}>
+          <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
+            <h3>{title}</h3>
+            <p>{message}</p>
+            <div className="confirm-dialog-actions">
+              <button className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+              <button className="btn btn-danger" onClick={onConfirm}>Delete</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ── TOGGLE ── */
+    function Toggle({ checked, onChange, id }) {
+      return (
+        <label className="toggle">
+          <input type="checkbox" id={id} checked={checked} onChange={e => onChange(e.target.checked)} />
+          <span className="toggle-track"></span>
+        </label>
+      );
+    }
+
+    /* ── LOGIN ── */
+    function Login({ onLogin }) {
+      const [username, setUsername] = useState('');
+      const [password, setPassword] = useState('');
+      const [error, setError] = useState('');
+      const [loading, setLoading] = useState(false);
+
+      async function handleSubmit(e) {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+          await apiFetch('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ username, password }),
+          });
+          onLogin();
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      return (
+        <div className="login-page">
+          <div className="login-card">
+            <div className="login-logo">
+              <img src="/images/bits-bytes-logo-wide-cropped.png" alt="Bits and Bytes Cafe" />
+            </div>
+            <h1>Admin Panel</h1>
+            <p className="login-sub">Sign in to manage your restaurant content</p>
+            {error && <div className="alert alert-error">{error}</div>}
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label htmlFor="un">Username</label>
+                <input id="un" type="text" value={username} onChange={e => setUsername(e.target.value)}
+                  placeholder="admin" required autoFocus autoComplete="username" />
+              </div>
+              <div className="form-group">
+                <label htmlFor="pw">Password</label>
+                <input id="pw" type="password" value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••" required autoComplete="current-password" />
+              </div>
+              <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
+                {loading ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
+            <p style={{ marginTop: 16, fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>
+              Default: admin / password123
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    /* ── SIDEBAR ── */
+    function Sidebar({ page, setPage, onLogout }) {
+      return (
+        <aside className="sidebar">
+          <div className="sidebar-brand">
+            <img src="/images/bits-bytes-logo-wide-cropped.png" alt="Bits and Bytes Cafe" />
+          </div>
+          <div className="sidebar-label">Content</div>
+          <nav className="sidebar-nav">
+            <button
+              className={`sidebar-nav-item${page === 'menu' ? ' active' : ''}`}
+              onClick={() => setPage('menu')}
+            >
+              <span className="sidebar-nav-icon">🍽</span>
+              Menu Manager
+            </button>
+            <button
+              className={`sidebar-nav-item${page === 'gallery' ? ' active' : ''}`}
+              onClick={() => setPage('gallery')}
+            >
+              <span className="sidebar-nav-icon">📷</span>
+              Photo Gallery
+            </button>
+          </nav>
+          <div className="sidebar-footer">
+            <button className="sidebar-logout" onClick={onLogout}>
+              <span>↩</span> Sign out
+            </button>
+          </div>
+        </aside>
+      );
+    }
+
+    /* ── MENU ITEM FORM ── */
+    const CATEGORIES = ['breakfast','lunch','wings','burgers','sides','drinks','other'];
+
+    function MenuItemForm({ item, onSave, onCancel, loading }) {
+      const [name, setName] = useState(item?.name || '');
+      const [description, setDescription] = useState(item?.description || '');
+      const [category, setCategory] = useState(item?.category || 'breakfast');
+      const [priceMode, setPriceMode] = useState(item?.priceTiers?.length ? 'tiers' : 'single');
+      const [price, setPrice] = useState(item?.price || '');
+      const [tiers, setTiers] = useState(
+        item?.priceTiers?.length ? item.priceTiers : [{ label: '', price: '' }]
+      );
+      const [seasonal, setSeasonal] = useState(item?.seasonal || false);
+      const [available, setAvailable] = useState(item?.available !== false);
+      const [imageFile, setImageFile] = useState(null);
+      const [imagePreview, setImagePreview] = useState(item?.image || '');
+      const [imageDrag, setImageDrag] = useState(false);
+      const fileRef = useRef();
+
+      function handleImageChange(file) {
+        if (!file) return;
+        setImageFile(file);
+        const reader = new FileReader();
+        reader.onload = e => setImagePreview(e.target.result);
+        reader.readAsDataURL(file);
+      }
+
+      function addTier() { setTiers(prev => [...prev, { label: '', price: '' }]); }
+      function removeTier(i) { setTiers(prev => prev.filter((_, idx) => idx !== i)); }
+      function updateTier(i, field, val) {
+        setTiers(prev => prev.map((t, idx) => idx === i ? { ...t, [field]: val } : t));
+      }
+
+      async function handleSubmit(e) {
+        e.preventDefault();
+        const fd = new FormData();
+        fd.append('name', name);
+        fd.append('description', description);
+        fd.append('category', category);
+        fd.append('seasonal', seasonal);
+        fd.append('available', available);
+        if (priceMode === 'single') {
+          fd.append('price', price);
+          fd.append('priceTiers', JSON.stringify([]));
+        } else {
+          fd.append('price', '');
+          fd.append('priceTiers', JSON.stringify(tiers.filter(t => t.label || t.price)));
+        }
+        fd.append('imageAlt', name);
+        if (imageFile) {
+          fd.append('image', imageFile);
+        } else {
+          fd.append('existingImage', item?.image || '');
+        }
+        await onSave(fd);
+      }
+
+      return (
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div className="form-group">
+              <label htmlFor="item-name">Name <span className="required">*</span></label>
+              <input id="item-name" type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Breakfast Combo" />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="item-cat">Category</label>
+                <select id="item-cat" value={category} onChange={e => setCategory(e.target.value)}>
+                  {CATEGORIES.map(c => (
+                    <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="item-desc">Description</label>
+              <textarea id="item-desc" value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of the item" rows={2} />
+            </div>
+
+            <div className="form-group">
+              <label>Pricing</label>
+              <div className="price-mode">
+                <button type="button" className={`price-mode-btn${priceMode === 'single' ? ' active' : ''}`} onClick={() => setPriceMode('single')}>
+                  Single price
+                </button>
+                <button type="button" className={`price-mode-btn${priceMode === 'tiers' ? ' active' : ''}`} onClick={() => setPriceMode('tiers')}>
+                  Multiple sizes
+                </button>
+              </div>
+              {priceMode === 'single' ? (
+                <input type="text" value={price} onChange={e => setPrice(e.target.value)} placeholder="e.g. $9.00 or special" />
+              ) : (
+                <div>
+                  {tiers.map((tier, i) => (
+                    <div key={i} className="price-tier-row">
+                      <input type="text" value={tier.label} onChange={e => updateTier(i, 'label', e.target.value)} placeholder="Label (e.g. Small)" />
+                      <input type="text" value={tier.price} onChange={e => updateTier(i, 'price', e.target.value)} placeholder="Price (e.g. 5.50)" />
+                      <button type="button" className="btn btn-ghost btn-icon" onClick={() => removeTier(i)} title="Remove tier" disabled={tiers.length === 1}>×</button>
+                    </div>
+                  ))}
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={addTier}>+ Add size</button>
+                </div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>Image</label>
+              <div
+                className={`image-upload-area${imageDrag ? ' drag-over' : ''}`}
+                onDragOver={e => { e.preventDefault(); setImageDrag(true); }}
+                onDragLeave={() => setImageDrag(false)}
+                onDrop={e => { e.preventDefault(); setImageDrag(false); handleImageChange(e.dataTransfer.files[0]); }}
+              >
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={e => handleImageChange(e.target.files[0])}
+                />
+                {imagePreview ? (
+                  <div className="image-preview">
+                    <img src={imagePreview} alt="Preview" />
+                    <button type="button" className="image-preview-remove" onClick={e => { e.stopPropagation(); setImageFile(null); setImagePreview(''); }}>×</button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ fontSize: 28, marginBottom: 6 }}>📷</div>
+                    <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 13 }}>Click or drag an image here</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>JPG, PNG, WebP up to 10 MB</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <hr className="section-divider" />
+
+            <div className="toggle-row">
+              <div>
+                <div className="toggle-label">Seasonal Item</div>
+                <div className="toggle-hint">Marks item as limited time / seasonal</div>
+              </div>
+              <Toggle checked={seasonal} onChange={setSeasonal} id="toggle-seasonal" />
+            </div>
+            <div className="toggle-row">
+              <div>
+                <div className="toggle-label">Available</div>
+                <div className="toggle-hint">Show this item on the public menu</div>
+              </div>
+              <Toggle checked={available} onChange={setAvailable} id="toggle-available" />
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? 'Saving…' : (item ? 'Save Changes' : 'Add Item')}
+            </button>
+          </div>
+        </form>
+      );
+    }
+
+    /* ── MENU MANAGER ── */
+    function MenuManager({ showToast }) {
+      const [items, setItems] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [saving, setSaving] = useState(false);
+      const [search, setSearch] = useState('');
+      const [filterCat, setFilterCat] = useState('all');
+      const [filterSeasonal, setFilterSeasonal] = useState('all');
+      const [modal, setModal] = useState(null); // null | 'add' | item object
+      const [deleteTarget, setDeleteTarget] = useState(null);
+
+      async function load() {
+        setLoading(true);
+        try { setItems(await apiFetch('/api/menu')); }
+        catch (err) { showToast(err.message, 'error'); }
+        finally { setLoading(false); }
+      }
+
+      useEffect(() => { load(); }, []);
+
+      async function handleSave(fd) {
+        setSaving(true);
+        try {
+          if (modal === 'add') {
+            const created = await fetch('/api/menu', { method: 'POST', body: fd }).then(r => r.json());
+            if (created.error) throw new Error(created.error);
+            setItems(prev => [...prev, created]);
+            showToast('Menu item added');
+          } else {
+            const updated = await fetch(`/api/menu/${modal.id}`, { method: 'PUT', body: fd }).then(r => r.json());
+            if (updated.error) throw new Error(updated.error);
+            setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
+            showToast('Menu item updated');
+          }
+          setModal(null);
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          setSaving(false);
+        }
+      }
+
+      async function handleDelete(id) {
+        try {
+          await apiFetch(`/api/menu/${id}`, { method: 'DELETE' });
+          setItems(prev => prev.filter(i => i.id !== id));
+          showToast('Item deleted');
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          setDeleteTarget(null);
+        }
+      }
+
+      async function toggleAvailable(item) {
+        try {
+          const fd = new FormData();
+          Object.entries(item).forEach(([k, v]) => {
+            if (k === 'available') fd.append(k, !item.available);
+            else if (k === 'priceTiers') fd.append(k, JSON.stringify(v));
+            else if (k !== 'image') fd.append(k, v);
+          });
+          fd.append('existingImage', item.image || '');
+          const updated = await fetch(`/api/menu/${item.id}`, { method: 'PUT', body: fd }).then(r => r.json());
+          setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
+          showToast(updated.available ? 'Item is now visible' : 'Item hidden from menu');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      const filtered = items.filter(item => {
+        const matchSearch = !search || item.name.toLowerCase().includes(search.toLowerCase());
+        const matchCat = filterCat === 'all' || item.category === filterCat;
+        const matchSeasonal = filterSeasonal === 'all' || (filterSeasonal === 'yes' ? item.seasonal : !item.seasonal);
+        return matchSearch && matchCat && matchSeasonal;
+      });
+
+      const stats = {
+        total: items.length,
+        available: items.filter(i => i.available).length,
+        seasonal: items.filter(i => i.seasonal).length,
+      };
+
+      return (
+        <div>
+          <div className="stats-row">
+            <div className="stat-card">
+              <div className="stat-value">{stats.total}</div>
+              <div className="stat-label">Total Items</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value" style={{ color: 'var(--green)' }}>{stats.available}</div>
+              <div className="stat-label">Available</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value" style={{ color: 'var(--yellow)' }}>{stats.seasonal}</div>
+              <div className="stat-label">Seasonal</div>
+            </div>
+          </div>
+
+          <div className="toolbar">
+            <div className="toolbar-left">
+              <input
+                className="search-input"
+                type="search"
+                placeholder="Search items…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              <select className="filter-select" value={filterCat} onChange={e => setFilterCat(e.target.value)}>
+                <option value="all">All categories</option>
+                {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+              </select>
+              <select className="filter-select" value={filterSeasonal} onChange={e => setFilterSeasonal(e.target.value)}>
+                <option value="all">All items</option>
+                <option value="yes">Seasonal only</option>
+                <option value="no">Regular only</option>
+              </select>
+            </div>
+            <div className="toolbar-right">
+              <button className="btn btn-primary" onClick={() => setModal('add')}>
+                + Add Item
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="loading-state"><div className="spinner"></div><span>Loading menu…</span></div>
+          ) : filtered.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">🍽</div>
+              <h3>{items.length === 0 ? 'No menu items yet' : 'No items match your filters'}</h3>
+              <p>{items.length === 0 ? 'Add your first menu item to get started.' : 'Try clearing your search or filters.'}</p>
+              {items.length === 0 && <button className="btn btn-primary" onClick={() => setModal('add')}>Add First Item</button>}
+            </div>
+          ) : (
+            <div className="menu-grid">
+              {filtered.map(item => (
+                <div key={item.id} className="menu-card" style={{ opacity: item.available ? 1 : 0.6 }}>
+                  {item.image
+                    ? <img className="menu-card-image" src={item.image} alt={item.imageAlt || item.name} loading="lazy" />
+                    : <div className="menu-card-image-placeholder">🍽</div>
+                  }
+                  <div className="menu-card-body">
+                    <div className="menu-card-name">{item.name}</div>
+                    {item.description && <div className="menu-card-desc">{item.description}</div>}
+                    <div className="menu-card-meta">
+                      <span className="badge badge-gray">{item.category}</span>
+                      {item.seasonal && <span className="badge badge-yellow">Seasonal</span>}
+                      {!item.available && <span className="badge badge-red">Hidden</span>}
+                    </div>
+                  </div>
+                  <div className="menu-card-footer">
+                    <div>
+                      <div className="menu-card-price">{formatPrice(item)}</div>
+                      {item.priceTiers?.length > 0 && (
+                        <div className="menu-card-price-tiers">
+                          {item.priceTiers.map(t => `${t.label} $${t.price}`).join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                    <div className="menu-card-actions">
+                      <button className="btn btn-ghost btn-icon btn-sm" title={item.available ? 'Hide' : 'Show'} onClick={() => toggleAvailable(item)}>
+                        {item.available ? '👁' : '🚫'}
+                      </button>
+                      <button className="btn btn-secondary btn-icon btn-sm" title="Edit" onClick={() => setModal(item)}>✏️</button>
+                      <button className="btn btn-danger btn-icon btn-sm" title="Delete" onClick={() => setDeleteTarget(item)}>🗑</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {modal && (
+            <div className="modal-overlay" onClick={() => setModal(null)}>
+              <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h2>{modal === 'add' ? 'Add Menu Item' : `Edit: ${modal.name}`}</h2>
+                  <button className="modal-close" onClick={() => setModal(null)}>×</button>
+                </div>
+                <MenuItemForm
+                  item={modal === 'add' ? null : modal}
+                  onSave={handleSave}
+                  onCancel={() => setModal(null)}
+                  loading={saving}
+                />
+              </div>
+            </div>
+          )}
+
+          {deleteTarget && (
+            <ConfirmDialog
+              title="Delete menu item?"
+              message={`"${deleteTarget.name}" will be permanently removed.`}
+              onConfirm={() => handleDelete(deleteTarget.id)}
+              onCancel={() => setDeleteTarget(null)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    /* ── GALLERY MANAGER ── */
+    function GalleryManager({ showToast }) {
+      const [items, setItems] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [uploading, setUploading] = useState(false);
+      const [dragOver, setDragOver] = useState(false);
+      const [pendingFile, setPendingFile] = useState(null);
+      const [pendingPreview, setPendingPreview] = useState('');
+      const [pendingCaption, setPendingCaption] = useState('');
+      const [deleteTarget, setDeleteTarget] = useState(null);
+      const [captionEdits, setCaptionEdits] = useState({});
+      const fileInputRef = useRef();
+
+      async function load() {
+        setLoading(true);
+        try { setItems(await apiFetch('/api/gallery')); }
+        catch (err) { showToast(err.message, 'error'); }
+        finally { setLoading(false); }
+      }
+
+      useEffect(() => { load(); }, []);
+
+      function handleFileSelect(file) {
+        if (!file) return;
+        setPendingFile(file);
+        setPendingCaption('');
+        const reader = new FileReader();
+        reader.onload = e => setPendingPreview(e.target.result);
+        reader.readAsDataURL(file);
+      }
+
+      function cancelUpload() {
+        setPendingFile(null);
+        setPendingPreview('');
+        setPendingCaption('');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+
+      async function handleUpload(e) {
+        e.preventDefault();
+        if (!pendingFile) return;
+        setUploading(true);
+        try {
+          const fd = new FormData();
+          fd.append('photo', pendingFile);
+          fd.append('caption', pendingCaption);
+          const created = await fetch('/api/gallery', { method: 'POST', body: fd }).then(r => r.json());
+          if (created.error) throw new Error(created.error);
+          setItems(prev => [...prev, created]);
+          showToast('Photo uploaded');
+          cancelUpload();
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          setUploading(false);
+        }
+      }
+
+      async function handleDelete(id) {
+        try {
+          await apiFetch(`/api/gallery/${id}`, { method: 'DELETE' });
+          setItems(prev => prev.filter(i => i.id !== id));
+          showToast('Photo deleted');
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          setDeleteTarget(null);
+        }
+      }
+
+      async function saveCaption(item) {
+        const caption = captionEdits[item.id] ?? item.caption;
+        try {
+          const updated = await apiFetch(`/api/gallery/${item.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ caption }),
+          });
+          setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
+          setCaptionEdits(prev => { const n = {...prev}; delete n[item.id]; return n; });
+          showToast('Caption saved');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+
+      return (
+        <div>
+          {/* Upload zone */}
+          {!pendingFile ? (
+            <div
+              className={`upload-zone${dragOver ? ' drag-over' : ''}`}
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => { e.preventDefault(); setDragOver(false); handleFileSelect(e.dataTransfer.files[0]); }}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={e => handleFileSelect(e.target.files[0])}
+              />
+              <div className="upload-zone-icon">📷</div>
+              <h3>Click or drag a photo here</h3>
+              <p>JPG, PNG, WebP up to 10 MB</p>
+            </div>
+          ) : (
+            <form className="upload-form" onSubmit={handleUpload}>
+              <img src={pendingPreview} alt="Upload preview" className="upload-form-preview" />
+              <div className="form-group">
+                <label htmlFor="upload-caption">Caption</label>
+                <input
+                  id="upload-caption"
+                  type="text"
+                  value={pendingCaption}
+                  onChange={e => setPendingCaption(e.target.value)}
+                  placeholder="Describe this photo (optional)"
+                  autoFocus
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className="btn btn-secondary" onClick={cancelUpload}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={uploading}>
+                  {uploading ? 'Uploading…' : 'Upload Photo'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Gallery grid */}
+          {loading ? (
+            <div className="loading-state"><div className="spinner"></div><span>Loading gallery…</span></div>
+          ) : items.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">📷</div>
+              <h3>No photos yet</h3>
+              <p>Upload your first photo using the area above.</p>
+            </div>
+          ) : (
+            <div>
+              <div style={{ marginBottom: 14, fontWeight: 600, fontSize: 13, color: 'var(--muted)' }}>
+                {items.length} photo{items.length !== 1 ? 's' : ''}
+              </div>
+              <div className="gallery-grid-admin">
+                {items.map(item => {
+                  const editCaption = captionEdits[item.id] ?? item.caption;
+                  const isDirty = item.id in captionEdits && captionEdits[item.id] !== item.caption;
+                  return (
+                    <div key={item.id} className="gallery-card-admin">
+                      <img className="gallery-card-image" src={item.src} alt={item.caption || 'Gallery photo'} loading="lazy" />
+                      <div className="gallery-card-body">
+                        <textarea
+                          className="gallery-caption-input"
+                          rows={2}
+                          value={editCaption}
+                          placeholder="Add a caption…"
+                          onChange={e => setCaptionEdits(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          onBlur={() => { if (isDirty) saveCaption(item); }}
+                        />
+                      </div>
+                      <div className="gallery-card-footer">
+                        {isDirty && (
+                          <button className="btn btn-secondary btn-sm" style={{ marginRight: 'auto' }} onClick={() => saveCaption(item)}>
+                            Save
+                          </button>
+                        )}
+                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteTarget(item)}>Delete</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {deleteTarget && (
+            <ConfirmDialog
+              title="Delete photo?"
+              message="This photo will be permanently removed from the gallery."
+              onConfirm={() => handleDelete(deleteTarget.id)}
+              onCancel={() => setDeleteTarget(null)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    /* ── DASHBOARD ── */
+    function Dashboard({ onLogout }) {
+      const [page, setPage] = useState('menu');
+      const { toasts, show: showToast } = useToast();
+
+      async function handleLogout() {
+        try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}
+        onLogout();
+      }
+
+      const pageInfo = {
+        menu: { title: 'Menu Manager', sub: 'Manage items shown in the Popular Bytes section' },
+        gallery: { title: 'Photo Gallery', sub: 'Manage photos shown in the Fresh from the Cafe section' },
+      };
+
+      return (
+        <div className="dashboard">
+          <Sidebar page={page} setPage={setPage} onLogout={handleLogout} />
+          <div className="main-content">
+            <div className="content-header">
+              <div>
+                <h1>{pageInfo[page].title}</h1>
+                <p>{pageInfo[page].sub}</p>
+              </div>
+              <a href="/" target="_blank" rel="noopener" className="btn btn-secondary btn-sm">
+                View Live Site ↗
+              </a>
+            </div>
+            <div className="content-body">
+              {page === 'menu' && <MenuManager showToast={showToast} />}
+              {page === 'gallery' && <GalleryManager showToast={showToast} />}
+            </div>
+          </div>
+          <ToastContainer toasts={toasts} />
+        </div>
+      );
+    }
+
+    /* ── APP ROOT ── */
+    function App() {
+      const [auth, setAuth] = useState(null); // null = loading
+
+      useEffect(() => {
+        fetch('/api/auth/status')
+          .then(r => r.json())
+          .then(d => setAuth(d.authenticated))
+          .catch(() => setAuth(false));
+      }, []);
+
+      if (auth === null) return <div className="init-loading"><div className="spinner"></div></div>;
+      if (!auth) return <Login onLogin={() => setAuth(true)} />;
+      return <Dashboard onLogout={() => setAuth(false)} />;
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
