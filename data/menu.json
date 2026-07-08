@@ -30,8 +30,14 @@
     "category": "wings",
     "price": "",
     "priceTiers": [
-      { "label": "5 pcs", "price": "5.50" },
-      { "label": "10 pcs", "price": "9.00" }
+      {
+        "label": "5 pcs",
+        "price": "5.50"
+      },
+      {
+        "label": "10 pcs",
+        "price": "9.00"
+      }
     ],
     "seasonal": false,
     "available": true,
@@ -45,8 +51,14 @@
     "category": "wings",
     "price": "",
     "priceTiers": [
-      { "label": "5 pcs", "price": "5.50" },
-      { "label": "10 pcs", "price": "9.00" }
+      {
+        "label": "5 pcs",
+        "price": "5.50"
+      },
+      {
+        "label": "10 pcs",
+        "price": "9.00"
+      }
     ],
     "seasonal": false,
     "available": true,
