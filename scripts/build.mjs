@@ -218,7 +218,7 @@ try {
   const { data: siteSettings } = await sb.from("site_settings").select("*").maybeSingle();
   const { data: menuItems } = await sb
     .from("menu_items")
-    .select("*, menu_categories(name, slug)")
+    .select("*, menu_categories(name, slug, display_order)")
     .eq("is_available", true)
     .order("display_order");
   if (siteSettings) {
@@ -247,6 +247,7 @@ try {
       ...item,
       category: item.menu_categories?.slug || item.category || item.category_id || "",
       categoryName: item.menu_categories?.name || "",
+      categoryDisplayOrder: item.menu_categories?.display_order ?? 0,
       image: item.image_url,
       available: item.is_available !== false,
       price: item.price,
@@ -292,6 +293,8 @@ await cp("scripts/seed.mjs", "dist/scripts/seed.mjs");
 await cp("package-lock.json", "dist/package-lock.json");
 await writeFile("index.html", html, "utf8");
 await writeFile("dist/index.html", html, "utf8");
+await writeFile("data/menu.json", `${JSON.stringify(menu, null, 2)}\n`, "utf8");
+await writeFile("dist/data/menu.json", `${JSON.stringify(menu, null, 2)}\n`, "utf8");
 await writeFile("robots.txt", robotsTxt(), "utf8");
 await writeFile("dist/robots.txt", robotsTxt(), "utf8");
 await writeFile("sitemap.xml", sitemapXml(), "utf8");

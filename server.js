@@ -377,13 +377,14 @@ app.delete('/api/categories/:id', requireAuth, async (req, res) => {
 app.get('/api/menu', async (req, res) => {
   try {
     const { data, error } = await supabase.from('menu_items')
-      .select('*, menu_categories(name, slug)')
+      .select('*, menu_categories(name, slug, display_order)')
       .order('display_order');
     if (error) throw error;
     const items = (data||[]).map(item => ({
       id: item.id, name: item.name, description: item.description,
       category: item.menu_categories?.slug || '',
       categoryId: item.category_id, categoryName: item.menu_categories?.name || '',
+      categoryDisplayOrder: item.menu_categories?.display_order ?? 0,
       price: item.price, priceTiers: item.price_tiers || [],
       available: item.is_available, seasonal: item.is_seasonal, featured: item.is_featured,
       image: item.image_url, imageAlt: item.image_alt,
@@ -408,10 +409,11 @@ app.post('/api/menu', requireAuth, upload.single('image'), async (req, res) => {
       is_available: b.available !== 'false', is_seasonal: b.seasonal === 'true',
       is_featured: b.featured === 'true',
       display_order: parseInt(b.displayOrder)||0
-    }).select('*, menu_categories(name, slug)').single();
+    }).select('*, menu_categories(name, slug, display_order)').single();
     if (error) throw error;
     await logActivity('content_created','menu_item',data.id,`Menu item "${data.name}" created`);
     res.json({ ...data, category: data.menu_categories?.slug||'', available: data.is_available,
+      categoryDisplayOrder: data.menu_categories?.display_order ?? 0,
       seasonal: data.is_seasonal, image: data.image_url, imageAlt: data.image_alt,
       priceTiers: data.price_tiers });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -430,10 +432,11 @@ app.put('/api/menu/:id', requireAuth, upload.single('image'), async (req, res) =
       is_featured: b.featured === 'true',
       display_order: parseInt(b.displayOrder)||0,
       updated_at: new Date().toISOString()
-    }).eq('id', req.params.id).select('*, menu_categories(name, slug)').single();
+    }).eq('id', req.params.id).select('*, menu_categories(name, slug, display_order)').single();
     if (error) throw error;
     await logActivity('content_updated','menu_item',data.id,`Menu item "${data.name}" updated`);
     res.json({ ...data, category: data.menu_categories?.slug||'', available: data.is_available,
+      categoryDisplayOrder: data.menu_categories?.display_order ?? 0,
       seasonal: data.is_seasonal, image: data.image_url, imageAlt: data.image_alt,
       priceTiers: data.price_tiers });
   } catch (err) { res.status(500).json({ error: err.message }); }
