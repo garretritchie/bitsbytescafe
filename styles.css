@@ -206,7 +206,7 @@ main {
   position: relative;
   overflow: hidden;
   max-width: var(--container);
-  min-height: 455px;
+  min-height: 320px;
   margin: 0 auto;
   border: 1px solid var(--line);
   border-radius: 24px;
@@ -250,11 +250,11 @@ main {
 .hero-inner {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(430px, 0.78fr) minmax(520px, 1.22fr);
-  min-height: 455px;
+  grid-template-columns: minmax(330px, 0.72fr) minmax(500px, 1.28fr);
+  min-height: 320px;
   max-width: var(--container);
   margin: 0 auto;
-  padding: 48px 64px 70px;
+  padding: 28px 44px 40px;
 }
 
 .hero-copy {
@@ -280,20 +280,20 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 18px;
-  padding: 8px 18px;
+  margin: 0 0 10px;
+  padding: 5px 12px;
   border: 1px solid rgba(77, 155, 34, 0.28);
   border-radius: 999px;
   color: var(--green);
   background: rgba(255, 255, 255, 0.7);
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   font-weight: 900;
   text-transform: uppercase;
 }
 
 .location-pill::before {
-  width: 15px;
-  height: 15px;
+  width: 12px;
+  height: 12px;
   border-radius: 50% 50% 4px 50%;
   background: var(--green);
   content: "";
@@ -302,9 +302,9 @@ main {
 
 .hero h1 {
   position: relative;
-  max-width: 520px;
+  max-width: 380px;
   margin: 0;
-  font-size: clamp(3.2rem, 5vw, 5rem);
+  font-size: clamp(2.35rem, 3.55vw, 3.45rem);
   line-height: 0.98;
   font-weight: 900;
   letter-spacing: 0;
@@ -329,25 +329,26 @@ main {
 }
 
 .hero-subtitle {
-  max-width: 430px;
-  margin: 18px 0 0;
+  max-width: 360px;
+  margin: 12px 0 0;
   color: #3f444b;
-  font-size: 1.12rem;
-  line-height: 1.45;
+  font-size: 0.9rem;
+  line-height: 1.38;
 }
 
 .hero-actions {
   display: flex;
   flex-wrap: nowrap;
   gap: 14px;
-  margin-top: 24px;
+  margin-top: 14px;
 }
 
 .button {
   min-width: 148px;
-  padding: 0 22px;
+  min-height: 38px;
+  padding: 0 18px;
   border: 2px solid var(--orange);
-  font-size: 0.92rem;
+  font-size: 0.84rem;
 }
 
 .button.primary {
@@ -365,7 +366,7 @@ main {
 }
 
 .button.secondary {
-  min-width: 232px;
+  min-width: 212px;
   color: var(--orange);
   background: rgba(255, 255, 255, 0.74);
 }
@@ -381,9 +382,9 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin: 20px 0 0;
+  margin: 10px 0 0;
   color: #b86b31;
-  font-size: 0.9rem;
+  font-size: 0.76rem;
   font-weight: 600;
 }
 
@@ -406,8 +407,8 @@ main {
   position: absolute;
   right: -9%;
   top: -6px;
-  width: clamp(760px, 67vw, 980px);
-  height: 106%;
+  width: clamp(610px, 56vw, 800px);
+  height: 104%;
   max-width: none;
   object-fit: cover;
   object-position: left center;
@@ -429,8 +430,8 @@ main {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   max-width: var(--container);
-  margin: -34px auto 0;
-  padding: 24px 18px;
+  margin: -18px auto 0;
+  padding: 14px 14px;
   border-radius: 22px;
   border: 1px solid rgba(236, 231, 221, 0.86);
   background:
@@ -455,7 +456,7 @@ main {
 .feature-strip article {
   position: relative;
   min-width: 0;
-  padding: 6px 22px;
+  padding: 3px 16px;
   text-align: center;
   transition: transform 180ms ease;
 }
@@ -467,13 +468,13 @@ main {
 .feature-icon {
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
-  margin: 0 auto 12px;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 7px;
   border-radius: 50%;
   color: var(--green);
   background: var(--green-soft);
-  font-size: 1.7rem;
+  font-size: 1.25rem;
   font-weight: 900;
   box-shadow:
     0 12px 22px rgba(77, 155, 34, 0.1),
@@ -486,8 +487,8 @@ main {
 }
 
 .feature-icon.sun::before {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #ff9d17;
   box-shadow: 0 0 0 8px rgba(255, 157, 23, 0.2);
@@ -499,8 +500,8 @@ main {
 }
 
 .feature-icon.burger::before {
-  width: 27px;
-  height: 18px;
+  width: 23px;
+  height: 15px;
   border-radius: 14px 14px 6px 6px;
   background: var(--orange);
   content: "";
@@ -511,8 +512,8 @@ main {
 }
 
 .feature-icon.heart::before {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   background: var(--orange);
   content: "";
   transform: rotate(45deg);
@@ -520,16 +521,16 @@ main {
 }
 
 .feature-icon.clock::before {
-  width: 24px;
-  height: 24px;
-  border: 4px solid var(--green);
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--green);
   border-radius: 50%;
   content: "";
 }
 
 .feature-strip h2 {
-  margin: 0 0 6px;
-  font-size: 0.96rem;
+  margin: 0 0 4px;
+  font-size: 0.8rem;
   font-weight: 900;
 }
 
@@ -537,7 +538,7 @@ main {
   max-width: 130px;
   margin: 0 auto;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.66rem;
   line-height: 1.28;
 }
 
