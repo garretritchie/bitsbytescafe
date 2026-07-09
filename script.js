@@ -39,9 +39,17 @@ function getVisitorId() {
 }
 
 function trackEvent(eventType, metadata = {}) {
-  fetch('/api/analytics/event', {
+  const url = window.BBC_SUPABASE_URL;
+  const key = window.BBC_SUPABASE_ANON_KEY;
+  if (!url || !key) return;
+  fetch(`${url}/rest/v1/analytics_events`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': key,
+      'Authorization': `Bearer ${key}`,
+      'Prefer': 'return=minimal'
+    },
     body: JSON.stringify({
       event_type: eventType,
       page_path: window.location.pathname,
