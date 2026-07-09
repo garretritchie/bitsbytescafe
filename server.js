@@ -8,6 +8,7 @@ import { readFileSync as readFileSyncFs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import { createPasswordCredential, verifyPasswordCredential } from './scripts/admin-password-auth.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR   = path.join(__dirname, 'data');
@@ -20,7 +21,7 @@ const CMS_FILE    = path.join(DATA_DIR, 'cms-data.json');
 try {
   const envText = readFileSyncFs(path.join(__dirname, '.env'), 'utf8');
   for (const line of envText.split('\n')) {
-    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.+)$/);
+    const m = line.trim().replace(/^\uFEFF/, '').match(/^([A-Z_][A-Z0-9_]*)=(.+)$/);
     if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
   }
 } catch {}
@@ -216,9 +217,33 @@ app.get('/preview', async (req, res) => {
 });
 
 // ── Auth API ──────────────────────────────────────────────────────────────────
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body || {};
-  if (username === 'admin' && password === 'password123') {
+  const normalized = String(username || '').trim().toLowerCase();
+  const email = normalized === 'admin' ? 'admin@bitsbytes.local' : normalized;
+  const { data: profile, error: profileError } = await supabase.from('admin_user_profiles')
+    .select('email,status,password_hash,password_salt')
+    .eq('email', email)
+    .maybeSingle();
+  if (profileError && /password_hash|password_salt/i.test(profileError.message || '')) {
+    if (normalized === 'admin' && password === 'password123') {
+      res.setHeader('Set-Cookie', `bbc_auth=${encodeURIComponent(ADMIN_TOKEN)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${8*60*60}`);
+      if (req.headers['content-type']?.includes('application/json')) {
+        return res.json({ ok: true });
+      }
+      return res.redirect('/admin/');
+    }
+    if (req.headers['content-type']?.includes('application/json')) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    return res.redirect('/admin/login?error=1');
+  }
+  const authenticated = profile?.status === 'active' && (
+    await verifyPasswordCredential(password || '', profile) ||
+    (!profile.password_hash && normalized === 'admin' && password === 'password123')
+  );
+
+  if (authenticated) {
     // Set persistent HTTP-only cookie (works across stateless serverless invocations)
     res.setHeader('Set-Cookie', `bbc_auth=${encodeURIComponent(ADMIN_TOKEN)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${8*60*60}`);
     if (req.session) {
@@ -640,7 +665,9 @@ app.delete('/api/gallery/:id', requireAuth, async (req, res) => {
 // ── Admin Users ───────────────────────────────────────────────────────────────
 app.get('/api/users', requireAuth, async (req, res) => {
   try {
-    const { data } = await supabase.from('admin_user_profiles').select('*').order('created_at');
+    const { data } = await supabase.from('admin_user_profiles')
+      .select('id, first_name, last_name, email, role, status, last_login, notes, created_at, updated_at')
+      .order('created_at');
     res.json(data||[]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -648,10 +675,13 @@ app.get('/api/users', requireAuth, async (req, res) => {
 app.post('/api/users', requireAuth, async (req, res) => {
   try {
     const b = req.body;
+    const passwordFields = b.password_hash && b.password_salt
+      ? { password_hash: b.password_hash, password_salt: b.password_salt, password_updated_at: b.password_updated_at || new Date().toISOString() }
+      : await createPasswordCredential(b.password || '');
     const { data, error } = await supabase.from('admin_user_profiles').insert({
       first_name:b.first_name?.trim()||'', last_name:b.last_name?.trim()||'',
       email:b.email?.trim()?.toLowerCase(), role:b.role||'staff', status:b.status||'active',
-      notes:b.notes?.trim()||''
+      notes:b.notes?.trim()||'', ...passwordFields
     }).select().single();
     if (error) return res.status(500).json({ error: error.message });
     await logActivity('user_created','user',data.id,`Admin user "${data.email}" added`);
@@ -662,11 +692,14 @@ app.post('/api/users', requireAuth, async (req, res) => {
 app.put('/api/users/:id', requireAuth, async (req, res) => {
   try {
     const b = req.body;
+    const passwordFields = b.password_hash && b.password_salt
+      ? { password_hash: b.password_hash, password_salt: b.password_salt, password_updated_at: b.password_updated_at || new Date().toISOString() }
+      : (b.password ? await createPasswordCredential(b.password) : {});
     const { data, error } = await supabase.from('admin_user_profiles').update({
       first_name:b.first_name?.trim()||'', last_name:b.last_name?.trim()||'',
       email:b.email?.trim()?.toLowerCase(), role:b.role||'staff',
       status:b.status||'active', notes:b.notes?.trim()||'',
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(), ...passwordFields
     }).eq('id',req.params.id).select().single();
     if (error) return res.status(500).json({ error: error.message });
     await logActivity('user_updated','user',data.id,`Admin user "${data.email}" updated`);

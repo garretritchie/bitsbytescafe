@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 try {
   const envText = readFileSync(".env", "utf8");
   for (const line of envText.split("\n")) {
-    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.+)$/);
+    const m = line.trim().replace(/^\uFEFF/, "").match(/^([A-Z_][A-Z0-9_]*)=(.+)$/);
     if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
   }
 } catch {}
@@ -305,5 +305,7 @@ async function injectAdminCreds(filePath) {
   await writeFile(filePath, content, "utf8");
 }
 await injectAdminCreds("admin/index.html");
+await injectAdminCreds("admin/login.html");
 await injectAdminCreds("dist/admin/index.html");
+await injectAdminCreds("dist/admin/login.html");
 console.log("Build: injected Supabase credentials into admin HTML");
