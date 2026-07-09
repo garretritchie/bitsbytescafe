@@ -26,9 +26,9 @@
 
       <form id="loginForm" novalidate>
         <div class="form-group">
-          <label for="un">Email</label>
-          <input id="un" name="username" type="email"
-            placeholder="your@email.com" required autofocus autocomplete="username">
+          <label for="un">Email or Username</label>
+          <input id="un" name="username" type="text"
+            placeholder="Email or username" required autofocus autocomplete="username">
         </div>
         <div class="form-group">
           <label for="pw">Password</label>
@@ -90,7 +90,6 @@
 
     document.getElementById('loginForm').addEventListener('submit', async function (e) {
       e.preventDefault();
-      const email = document.getElementById('un').value.trim().toLowerCase();
       const password = document.getElementById('pw').value;
       const errorEl = document.getElementById('error-msg');
       const btn = document.getElementById('submitBtn');
@@ -100,12 +99,17 @@
       btn.disabled = true;
 
       try {
-        // Look up user profile by email
-        const { data: profiles, error: profileErr } = await sb
-          .from('admin_user_profiles')
-          .select('id, email, status')
-          .eq('email', email)
-          .limit(1);
+        const input = document.getElementById('un').value.trim().toLowerCase();
+
+        // Support plain username (e.g. "admin") by matching email prefix
+        let emailQuery = sb.from('admin_user_profiles').select('id, email, status').limit(1);
+        if (input.includes('@')) {
+          emailQuery = emailQuery.eq('email', input);
+        } else {
+          emailQuery = emailQuery.ilike('email', input + '@%');
+        }
+
+        const { data: profiles, error: profileErr } = await emailQuery;
 
         if (profileErr || !profiles || profiles.length === 0) {
           throw new Error('Invalid email or password.');
