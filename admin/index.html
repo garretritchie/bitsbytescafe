@@ -36,25 +36,6 @@
     function getStoredToken() { return localStorage.getItem(STORE_KEY) || ''; }
     function clearStoredToken() { localStorage.removeItem(STORE_KEY); }
 
-    async function hashPassword(password, salt) {
-      const bytes = new TextEncoder().encode(`${salt}|${password}`);
-      const digest = await crypto.subtle.digest('SHA-256', bytes);
-      return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-    function makePasswordSalt() {
-      const bytes = new Uint8Array(16);
-      crypto.getRandomValues(bytes);
-      return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-    async function makePasswordCredential(password) {
-      const password_salt = makePasswordSalt();
-      return {
-        password_salt,
-        password_hash: await hashPassword(password, password_salt),
-        password_updated_at: new Date().toISOString(),
-      };
-    }
-
     /* ── SUPABASE DATA HELPERS ── */
     async function sbGet(table, opts = {}) {
       let q = sb.from(table).select(opts.select || '*');
@@ -158,56 +139,6 @@
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
 
-    function classifyVisitorSource(event = {}) {
-      if (event.source) return event.source;
-      if (event.metadata?.source) return event.metadata.source;
-      const referrer = String(event.referrer || '').toLowerCase();
-      if (!referrer) return 'direct';
-      if (referrer.includes('google.')) return 'google';
-      if (referrer.includes('facebook.') || referrer.includes('fb.')) return 'facebook';
-      if (referrer.includes('instagram.')) return 'instagram';
-      if (referrer.includes('tiktok.')) return 'tiktok';
-      if (referrer.includes('bing.') || referrer.includes('yahoo.') || referrer.includes('duckduckgo.')) return 'search';
-      return 'referral';
-    }
-
-    function summarizeAnalytics(events = []) {
-      const pageViews = events.filter(e => e.event_type === 'page_view');
-      const shareClicks = events.filter(e => e.event_type === 'social_share_click');
-      const countBy = (rows, keyFn) => rows.reduce((acc, row) => {
-        const key = keyFn(row);
-        if (key) acc[key] = (acc[key] || 0) + 1;
-        return acc;
-      }, {});
-      const rank = (counts, keyName, limit = 10) => Object.entries(counts)
-        .sort(([,a],[,b]) => b - a)
-        .slice(0, limit)
-        .map(([key, count]) => ({ [keyName]: key, count }));
-      const byDay = countBy(pageViews, e => e.created_at?.slice(0, 10));
-      const activityByDate = {};
-      events.forEach(e => {
-        const day = e.created_at?.slice(0, 10);
-        const type = e.event_type || 'unknown';
-        if (!day) return;
-        activityByDate[day] = activityByDate[day] || {};
-        activityByDate[day][type] = (activityByDate[day][type] || 0) + 1;
-      });
-      return {
-        totalPageViews: pageViews.length,
-        uniqueVisitors: new Set(pageViews.map(e => e.visitor_id).filter(Boolean)).size,
-        totalShares: shareClicks.length,
-        fbShares: shareClicks.filter(e => e.metadata?.platform === 'facebook').length,
-        waShares: shareClicks.filter(e => e.metadata?.platform === 'whatsapp').length,
-        trafficByDay: Object.entries(byDay).sort(([a],[b]) => a.localeCompare(b)).map(([date, count]) => ({ date, count })),
-        activityByDay: Object.entries(activityByDate).sort(([a],[b]) => a.localeCompare(b)).map(([date, values]) => ({ date, ...values, total: Object.values(values).reduce((sum, n) => sum + n, 0) })),
-        topPages: rank(countBy(pageViews, e => e.page_path || '/'), 'path'),
-        visitorSources: rank(countBy(pageViews, classifyVisitorSource), 'source'),
-        activityTypes: rank(countBy(events, e => e.event_type || 'unknown'), 'eventType'),
-        events,
-        recentEvents: [...events].sort((a,b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))).slice(0, 25),
-      };
-    }
-
     async function apiFetch(url, opts = {}) {
       const method = (opts.method || 'GET').toUpperCase();
       const body = opts.body ? JSON.parse(opts.body) : null;
@@ -306,21 +237,35 @@
         if (range === 'today') since = new Date().toISOString().slice(0, 10);
         else if (range === '7d') since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
         else if (range === '30d') since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        let query = sb.from('analytics_events').select('*').order('created_at', { ascending: false });
-        if (since) query = query.gte('created_at', since);
-        const { data: events, error } = await query;
-        if (error) console.warn('Skipping analytics_events:', error.message);
-        return summarizeAnalytics(events || []);
+        let pvQ = sb.from('analytics_events').select('*').eq('event_type', 'page_view');
+        if (since) pvQ = pvQ.gte('created_at', since);
+        const { data: pvData, error: pvError } = await pvQ;
+        if (pvError) console.warn('Skipping analytics_events:', pvError.message);
+        const views = pvData || [];
+        const { data: shares, error: shareError } = await sb.from('analytics_events').select('*').eq('event_type', 'social_share_click');
+        if (shareError) console.warn('Skipping social share analytics:', shareError.message);
+        const allShares = shares || [];
+        const byDay = {};
+        views.forEach(v => {
+          const d = v.created_at?.slice(0, 10);
+          if (d) byDay[d] = (byDay[d] || 0) + 1;
+        });
+        const byPage = {};
+        views.forEach(v => { const path = v.page_path || '/'; byPage[path] = (byPage[path] || 0) + 1; });
+        return {
+          totalPageViews: views.length,
+          uniqueVisitors: new Set(views.map(v => v.visitor_id).filter(Boolean)).size,
+          totalShares: allShares.length,
+          fbShares: allShares.filter(s => s.metadata?.platform === 'facebook').length,
+          waShares: allShares.filter(s => s.metadata?.platform === 'whatsapp').length,
+          trafficByDay: Object.entries(byDay).sort(([a],[b]) => a.localeCompare(b)).map(([date, count]) => ({ date, count })),
+          topPages: Object.entries(byPage).sort(([,a],[,b]) => b-a).slice(0,10).map(([path, count]) => ({ path, count })),
+        };
       }
 
       // ── users ──────────────────────────────────────────────────────────────
-      if (url === '/api/users' && method === 'GET') {
-        const { data, error } = await sb.from('admin_user_profiles')
-          .select('id, first_name, last_name, email, role, status, last_login, notes, created_at, updated_at')
-          .order('created_at');
-        if (error) throw new Error(error.message);
-        return data || [];
-      }
+      if (url === '/api/users' && method === 'GET')
+        return sbGet('admin_user_profiles', { order: 'created_at' });
       if (url === '/api/users' && method === 'POST')
         return sbInsert('admin_user_profiles', body);
       const userMatch = url.match(/^\/api\/users\/(.+)$/);
@@ -1631,8 +1576,6 @@
       const [data, setData] = useState(null);
       const [loading, setLoading] = useState(true);
       const [range, setRange] = useState('7d');
-      const [sourceFilter, setSourceFilter] = useState('all');
-      const [activityFilter, setActivityFilter] = useState('all');
 
       function load(r) {
         setLoading(true);
@@ -1644,19 +1587,7 @@
 
       useEffect(() => { load(range); }, [range]);
 
-      const allEvents = data?.events || [];
-      const sourceOptions = ['all', ...new Set(allEvents.filter(e => e.event_type === 'page_view').map(classifyVisitorSource))];
-      const activityOptions = ['all', ...new Set(allEvents.map(e => e.event_type || 'unknown'))];
-      const chartData = data ? summarizeAnalytics(allEvents.filter(e => {
-        const sourceOk = sourceFilter === 'all' || classifyVisitorSource(e) === sourceFilter;
-        const activityOk = activityFilter === 'all' || (e.event_type || 'unknown') === activityFilter;
-        return sourceOk && activityOk;
-      })) : null;
-      const maxCount = chartData?.trafficByDay?.length ? Math.max(...chartData.trafficByDay.map(d => d.count), 1) : 1;
-      const maxActivity = chartData?.activityByDay?.length ? Math.max(...chartData.activityByDay.map(d => d.total), 1) : 1;
-      const maxSource = chartData?.visitorSources?.length ? Math.max(...chartData.visitorSources.map(s => s.count), 1) : 1;
-      const maxType = chartData?.activityTypes?.length ? Math.max(...chartData.activityTypes.map(t => t.count), 1) : 1;
-      const labelize = value => String(value || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const maxCount = data?.trafficByDay?.length ? Math.max(...data.trafficByDay.map(d => d.count), 1) : 1;
 
       return (
         <div className="analytics-page">
@@ -1666,39 +1597,31 @@
                 <button key={val} className={`btn ${range === val ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setRange(val)}>{label}</button>
               ))}
             </div>
-            <div className="toolbar-right">
-              <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} aria-label="Filter by source">
-                {sourceOptions.map(source => <option key={source} value={source}>{source === 'all' ? 'All sources' : labelize(source)}</option>)}
-              </select>
-              <select value={activityFilter} onChange={e => setActivityFilter(e.target.value)} aria-label="Filter by activity">
-                {activityOptions.map(type => <option key={type} value={type}>{type === 'all' ? 'All activity' : labelize(type)}</option>)}
-              </select>
-            </div>
           </div>
 
           {loading ? (
             <div className="loading-state"><div className="spinner"></div><span>Loading analytics…</span></div>
-          ) : !chartData ? null : (
+          ) : !data ? null : (
             <>
               <div className="stats-row">
-                <div className="stat-card"><div className="stat-value">{chartData.totalPageViews}</div><div className="stat-label">Page Views</div></div>
-                <div className="stat-card"><div className="stat-value">{chartData.uniqueVisitors}</div><div className="stat-label">Unique Visitors</div></div>
-                <div className="stat-card"><div className="stat-value">{chartData.events?.length || 0}</div><div className="stat-label">Activity Events</div></div>
+                <div className="stat-card"><div className="stat-value">{data.totalPageViews}</div><div className="stat-label">Page Views</div></div>
+                <div className="stat-card"><div className="stat-value">{data.uniqueVisitors}</div><div className="stat-label">Unique Visitors</div></div>
+                <div className="stat-card"><div className="stat-value">{data.totalShares}</div><div className="stat-label">Social Shares</div></div>
                 <div className="stat-card">
                   <div className="stat-value" style={{ fontSize: 16 }}>
-                    <span style={{ color: '#1877f2' }}>FB {chartData.fbShares}</span>
+                    <span style={{ color: '#1877f2' }}>FB {data.fbShares}</span>
                     <span style={{ margin: '0 6px', color: 'var(--border)' }}>|</span>
-                    <span style={{ color: '#25d366' }}>WA {chartData.waShares}</span>
+                    <span style={{ color: '#25d366' }}>WA {data.waShares}</span>
                   </div>
                   <div className="stat-label">Share Breakdown</div>
                 </div>
               </div>
 
-              {chartData.trafficByDay?.length > 0 && (
+              {data.trafficByDay?.length > 0 && (
                 <div className="chart-card">
                   <div className="chart-title">Daily Page Views</div>
                   <div className="bar-chart">
-                    {chartData.trafficByDay.map(d => (
+                    {data.trafficByDay.map(d => (
                       <div key={d.date} className="bar-col">
                         <div className="bar-value">{d.count}</div>
                         <div className="bar-fill" style={{ height: `${Math.max(4, (d.count / maxCount) * 120)}px` }}></div>
@@ -1709,80 +1632,14 @@
                 </div>
               )}
 
-              {chartData.activityByDay?.length > 0 && (
-                <div className="chart-card">
-                  <div className="chart-title">Daily Activity Events</div>
-                  <div className="bar-chart">
-                    {chartData.activityByDay.map(d => (
-                      <div key={d.date} className="bar-col">
-                        <div className="bar-value">{d.total}</div>
-                        <div className="bar-fill bar-fill-blue" style={{ height: `${Math.max(4, (d.total / maxActivity) * 120)}px` }}></div>
-                        <div className="bar-label">{dayLabel(d.date)}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="analytics-grid">
-                {chartData.visitorSources?.length > 0 && (
-                  <div className="chart-card">
-                    <div className="chart-title">Visitor Sources</div>
-                    <div className="rank-chart">
-                      {chartData.visitorSources.map(s => (
-                        <div key={s.source} className="rank-row">
-                          <span>{labelize(s.source)}</span>
-                          <div className="rank-track"><div className="rank-fill" style={{ width: `${Math.max(6, (s.count / maxSource) * 100)}%` }}></div></div>
-                          <strong>{s.count}</strong>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {chartData.activityTypes?.length > 0 && (
-                  <div className="chart-card">
-                    <div className="chart-title">Activity Types</div>
-                    <div className="rank-chart">
-                      {chartData.activityTypes.map(t => (
-                        <div key={t.eventType} className="rank-row">
-                          <span>{labelize(t.eventType)}</span>
-                          <div className="rank-track"><div className="rank-fill rank-fill-blue" style={{ width: `${Math.max(6, (t.count / maxType) * 100)}%` }}></div></div>
-                          <strong>{t.count}</strong>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {chartData.topPages?.length > 0 && (
+              {data.topPages?.length > 0 && (
                 <div className="table-card">
                   <div style={{ padding: '16px 20px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Top Pages</div>
                   <table className="data-table">
                     <thead><tr><th>Page</th><th style={{ textAlign: 'right' }}>Views</th></tr></thead>
                     <tbody>
-                      {chartData.topPages.map(p => (
+                      {data.topPages.map(p => (
                         <tr key={p.path}><td><code className="code-badge">{p.path}</code></td><td style={{ textAlign: 'right' }}>{p.count}</td></tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {chartData.recentEvents?.length > 0 && (
-                <div className="table-card">
-                  <div style={{ padding: '16px 20px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Recent Activity</div>
-                  <table className="data-table">
-                    <thead><tr><th>Activity</th><th>Source</th><th>Page</th><th style={{ textAlign: 'right' }}>When</th></tr></thead>
-                    <tbody>
-                      {chartData.recentEvents.map((event, index) => (
-                        <tr key={`${event.created_at}-${index}`}>
-                          <td>{labelize(event.event_type)}</td>
-                          <td>{labelize(classifyVisitorSource(event))}</td>
-                          <td><code className="code-badge">{event.page_path || '/'}</code></td>
-                          <td style={{ textAlign: 'right' }}>{timeAgo(event.created_at)}</td>
-                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -1800,7 +1657,7 @@
       const [loading, setLoading] = useState(true);
       const [modal, setModal] = useState(null);
       const [saving, setSaving] = useState(false);
-      const emptyForm = { first_name: '', last_name: '', email: '', role: 'staff', status: 'active', notes: '', password: '', password_confirm: '' };
+      const emptyForm = { first_name: '', last_name: '', email: '', role: 'staff', status: 'active', notes: '' };
       const [form, setForm] = useState(emptyForm);
 
       async function load() {
@@ -1813,22 +1670,17 @@
       useEffect(() => { load(); }, []);
 
       function openAdd() { setForm(emptyForm); setModal('add'); }
-      function openEdit(u) { setForm({ first_name: u.first_name || '', last_name: u.last_name || '', email: u.email || '', role: u.role || 'staff', status: u.status || 'active', notes: u.notes || '', password: '', password_confirm: '' }); setModal(u); }
+      function openEdit(u) { setForm({ first_name: u.first_name || '', last_name: u.last_name || '', email: u.email || '', role: u.role || 'staff', status: u.status || 'active', notes: u.notes || '' }); setModal(u); }
 
       async function handleSave() {
         setSaving(true);
         try {
-          const password = form.password || '';
-          if (modal === 'add' && !password.trim()) throw new Error('Password is required for new users');
-          if (password && password !== form.password_confirm) throw new Error('Passwords do not match');
-          const { password: _password, password_confirm: _passwordConfirm, ...profile } = form;
-          const payload = password ? { ...profile, ...(await makePasswordCredential(password)) } : profile;
           if (modal === 'add') {
-            const created = await apiFetch('/api/users', { method: 'POST', body: JSON.stringify(payload) });
+            const created = await apiFetch('/api/users', { method: 'POST', body: JSON.stringify(form) });
             setUsers(prev => [...prev, created]);
             showToast('User added');
           } else {
-            const updated = await apiFetch(`/api/users/${modal.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+            const updated = await apiFetch(`/api/users/${modal.id}`, { method: 'PUT', body: JSON.stringify(form) });
             setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
             showToast('User updated');
           }
@@ -1900,16 +1752,6 @@
                     <div className="form-group"><label>Last Name</label><input type="text" value={form.last_name} onChange={e => setForm(f => ({ ...f, last_name: e.target.value }))} /></div>
                   </div>
                   <div className="form-group"><label>Email <span className="required">*</span></label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>{modal === 'add' ? 'Password ' : 'New Password '} {modal === 'add' && <span className="required">*</span>}</label>
-                      <input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} autoComplete="new-password" />
-                    </div>
-                    <div className="form-group">
-                      <label>Confirm Password</label>
-                      <input type="password" value={form.password_confirm} onChange={e => setForm(f => ({ ...f, password_confirm: e.target.value }))} autoComplete="new-password" />
-                    </div>
-                  </div>
                   <div className="form-row">
                     <div className="form-group">
                       <label>Role</label>

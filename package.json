@@ -5,10 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js",
-    "dev:bolt": "node server.js",
-    "health:bolt": "node scripts/bolt-health.mjs",
-    "test:analytics": "node --test tests/analytics-summary.test.mjs",
-    "test:passwords": "node --test tests/admin-password-auth.test.mjs",
     "build": "node scripts/build.mjs",
     "seed": "node scripts/seed.js"
   },

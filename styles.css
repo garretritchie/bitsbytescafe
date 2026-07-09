@@ -110,8 +110,7 @@ main {
   top: 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: auto auto;
-  justify-content: space-between;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 28px;
   min-height: 88px;
@@ -136,6 +135,44 @@ main {
   width: clamp(178px, 18vw, 230px);
   height: 54px;
   object-fit: contain;
+}
+
+.nav-links {
+  display: flex;
+  justify-content: center;
+  gap: clamp(24px, 5vw, 60px);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.nav-links a {
+  position: relative;
+  text-decoration: none;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.nav-links a:hover,
+.nav-links a:focus-visible {
+  color: var(--orange);
+  transform: translateY(-1px);
+}
+
+.nav-links a::before {
+  position: absolute;
+  inset: -9px -13px;
+  z-index: -1;
+  border-radius: 999px;
+  background: rgba(243, 108, 19, 0.08);
+  content: "";
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.nav-links a:hover::before,
+.nav-links a:focus-visible::before {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .header-phone {
@@ -167,6 +204,18 @@ main {
     0 18px 34px rgba(171, 80, 10, 0.18),
     0 0 0 6px rgba(243, 108, 19, 0.06);
   transform: translateY(-1px);
+}
+
+.nav-links a:hover::after,
+.nav-links a:focus-visible::after {
+  position: absolute;
+  left: 0;
+  bottom: -12px;
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--orange);
+  content: "";
 }
 
 .button {
@@ -1396,7 +1445,16 @@ main {
   }
 
   .site-header {
+    grid-template-columns: auto auto;
     justify-content: space-between;
+  }
+
+  .nav-links {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: space-between;
+    overflow-x: auto;
+    padding-bottom: 4px;
   }
 
   .hero-inner {
@@ -1514,6 +1572,11 @@ main {
     width: clamp(132px, 43vw, 178px);
   }
 
+  .nav-links {
+    gap: 22px;
+    font-size: 0.82rem;
+  }
+
   .header-phone {
     min-height: 38px;
     padding: 0 10px;
@@ -1564,8 +1627,8 @@ main {
   }
 
   .hero-reference-image {
-    right: -8%;
-    width: 112%;
+    right: -23%;
+    width: 138%;
     object-position: left center;
   }
 

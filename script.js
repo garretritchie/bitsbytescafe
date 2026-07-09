@@ -38,63 +38,18 @@ function getVisitorId() {
   return id;
 }
 
-function visitorSource() {
-  const params = new URLSearchParams(window.location.search);
-  const campaignSource = params.get('utm_source') || params.get('source');
-  if (campaignSource) return campaignSource.toLowerCase();
-  const ref = document.referrer || '';
-  if (!ref) return 'direct';
-  try {
-    const host = new URL(ref).hostname.toLowerCase();
-    if (host.includes('google.')) return 'google';
-    if (host.includes('facebook.') || host.includes('fb.')) return 'facebook';
-    if (host.includes('instagram.')) return 'instagram';
-    if (host.includes('tiktok.')) return 'tiktok';
-    if (host.includes('bing.') || host.includes('yahoo.') || host.includes('duckduckgo.')) return 'search';
-    return 'referral';
-  } catch {
-    return 'referral';
-  }
-}
-
 function trackEvent(eventType, metadata = {}) {
-  const source = visitorSource();
-  const event = {
-    event_type: eventType,
-    page_path: window.location.pathname,
-    referrer: document.referrer || '',
-    visitor_id: getVisitorId(),
-    source,
-    metadata: { source, ...metadata }
-  };
-
   fetch('/api/analytics/event', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(event)
-  })
-    .then(res => { if (!res.ok) return insertAnalyticsEvent(event); })
-    .catch(() => insertAnalyticsEvent(event));
-}
-
-async function insertAnalyticsEvent(event) {
-  const url = window.BBC_SUPABASE_URL;
-  const key = window.BBC_SUPABASE_ANON_KEY;
-  if (!url || !key || url.includes('{{')) return;
-  const endpoint = `${url.replace(/\/+$/, '')}/rest/v1/analytics_events`;
-  const headers = {
-    apikey: key,
-    Authorization: `Bearer ${key}`,
-    'Content-Type': 'application/json',
-    Prefer: 'return=minimal'
-  };
-  let body = JSON.stringify(event);
-  let res = await fetch(endpoint, { method: 'POST', headers, body });
-  if (!res.ok && String(await res.text()).includes('source')) {
-    const { source: _source, ...legacyEvent } = event;
-    body = JSON.stringify(legacyEvent);
-    res = await fetch(endpoint, { method: 'POST', headers, body });
-  }
+    body: JSON.stringify({
+      event_type: eventType,
+      page_path: window.location.pathname,
+      referrer: document.referrer || '',
+      visitor_id: getVisitorId(),
+      metadata
+    })
+  }).catch(() => {});
 }
 
 trackEvent('page_view');
@@ -143,7 +98,6 @@ function shortDescription(description) {
 }
 
 function openMenuModal(item) {
-  trackEvent('menu_modal_open', { item: item.name, category: item.category });
   const imgSrc = assetUrl(item.image || MENU_IMAGE_FALLBACK);
   const imgAlt = item.image ? (item.imageAlt || item.name) : 'Photo Unavailable';
   menuModalImage.src = imgSrc;
@@ -204,7 +158,7 @@ function assetUrl(src) {
 function sortMenuItemsForDisplay(items) {
   const categoryOrder = new Map();
   items.forEach((item) => {
-    if (!categoryOrder.has(item.category)) categoryOrder.set(item.category, categorySortValue(item, categoryOrder.size));
+    if (!categoryOrder.has(item.category)) categoryOrder.set(item.category, categoryOrder.size);
   });
 
   return items
@@ -222,38 +176,6 @@ function sortMenuItemsForDisplay(items) {
 }
 
 /* ── MENU FILTER ── */
-function categorySortValue(item, fallback) {
-  const order = Number(item.categoryDisplayOrder ?? item.category_display_order);
-  return Number.isFinite(order) ? order : fallback;
-}
-
-function orderedCategories(items) {
-  const categories = new Map();
-  items.forEach((item, index) => {
-    if (!item.category || categories.has(item.category)) return;
-    categories.set(item.category, {
-      category: item.category,
-      order: categorySortValue(item, index)
-    });
-  });
-  return [...categories.values()]
-    .sort((a, b) => a.order - b.order || a.category.localeCompare(b.category))
-    .map(({ category }) => category);
-}
-
-function orderMenuFilterButtons(items) {
-  const filter = document.querySelector('.menu-filter');
-  if (!filter) return;
-  const buttons = new Map([...filter.querySelectorAll('[data-menu-filter]')].map(btn => [btn.getAttribute('data-menu-filter'), btn]));
-  const allButton = buttons.get('all');
-  filter.innerHTML = '';
-  if (allButton) filter.appendChild(allButton);
-  orderedCategories(items).forEach(category => {
-    const button = buttons.get(category);
-    if (button) filter.appendChild(button);
-  });
-}
-
 function setupMenuFilter(onChange) {
   const filterButtons = document.querySelectorAll('[data-menu-filter]');
 
@@ -278,7 +200,9 @@ function minCategoryPrice(items) {
 }
 
 function categorySummaries(items) {
-  return orderedCategories(items)
+  const categoryOrder = ['breakfast', 'lunch', 'chicken-wings', 'sandwiches-wraps-burgers', 'sides-salads'];
+
+  return categoryOrder
     .map(category => {
       const categoryItems = items.filter(item => item.category === category);
       if (categoryItems.length === 0) return null;
@@ -365,7 +289,6 @@ async function renderMenu() {
     }
 
     const itemMap = new Map(visible.map(item => [String(item.id), item]));
-    orderMenuFilterButtons(visible);
 
     function bindItemCards() {
       grid.querySelectorAll('[data-menu-detail]').forEach((btn) => {
@@ -387,7 +310,6 @@ async function renderMenu() {
         btn.classList.toggle('is-active', btn.getAttribute('data-menu-filter') === category);
       });
       renderItemCards(grid, visible.filter(item => item.category === category));
-      trackEvent('menu_filter_click', { category });
       bindItemCards();
     }
 
@@ -395,11 +317,9 @@ async function renderMenu() {
     setupMenuFilter((filter) => {
       if (filter === 'all') {
         renderCategoryCards(grid, visible, selectCategory);
-        trackEvent('menu_filter_click', { category: 'all' });
         return;
       }
       renderItemCards(grid, visible.filter(item => item.category === filter));
-      trackEvent('menu_filter_click', { category: filter });
       bindItemCards();
     });
   } catch {

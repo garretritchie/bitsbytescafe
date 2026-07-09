@@ -43,12 +43,6 @@
   </div>
 
   <script>
-    window.BBC_SUPABASE_URL = 'https://rqjkqigxwqyxyexrfykb.supabase.co';
-    window.BBC_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxamtxaWd4d3F5eHlleHJmeWtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1MTczNTIsImV4cCI6MjA5OTA5MzM1Mn0.J97To7TUkxqfVlS5ZfIx8P106Ng2tuIr64XgfjvNd4E';
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <script>
-    const sb = supabase.createClient(window.BBC_SUPABASE_URL, window.BBC_SUPABASE_ANON_KEY);
     // Auth token is derived the same way as server/ADMIN_TOKEN so they always match.
     const ADMIN_TOKEN = btoa('admin:password123');
     const STORE_KEY = 'bbcAdminToken';
@@ -65,61 +59,24 @@
       el.style.display = 'block';
     }
 
-    async function hashPassword(password, salt) {
-      const bytes = new TextEncoder().encode(`${salt}|${password}`);
-      const digest = await crypto.subtle.digest('SHA-256', bytes);
-      return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    async function authenticateUser(username, password) {
-      const normalized = username.trim().toLowerCase();
-      const email = normalized === 'admin' ? 'admin@bitsbytes.local' : normalized;
-      const { data, error } = await sb.from('admin_user_profiles')
-        .select('email, status, password_hash, password_salt')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (error) {
-        if (normalized === 'admin' && password === 'password123' && /password_hash|password_salt/i.test(error.message || '')) {
-          return true;
-        }
-        throw error;
-      }
-      if (!data || data.status !== 'active') return false;
-      if (!data.password_hash || !data.password_salt) return normalized === 'admin' && password === 'password123';
-      return await hashPassword(password, data.password_salt) === data.password_hash;
-    }
-
-    document.getElementById('loginForm').addEventListener('submit', async function (e) {
+    document.getElementById('loginForm').addEventListener('submit', function (e) {
       e.preventDefault();
       const username = document.getElementById('un').value.trim();
       const password = document.getElementById('pw').value;
       const errorEl = document.getElementById('error-msg');
       const btn = document.getElementById('submitBtn');
 
-      btn.textContent = 'Signing in…';
-      btn.disabled = true;
-      errorEl.style.display = 'none';
-
-      let ok = false;
-      try {
-        ok = await authenticateUser(username, password);
-      } catch (err) {
-        errorEl.textContent = err.message || 'Unable to sign in.';
-        errorEl.style.display = 'block';
-      }
-
-      if (ok) {
+      if (username === 'admin' && password === 'password123') {
         // Store the auth token — this is what the admin SPA and API calls rely on.
         localStorage.setItem(STORE_KEY, ADMIN_TOKEN);
+        btn.textContent = 'Signing in…';
+        btn.disabled = true;
         window.location.replace('/admin/');
       } else {
-        if (!errorEl.textContent) errorEl.textContent = 'Invalid username or password.';
+        errorEl.textContent = 'Invalid username or password.';
         errorEl.style.display = 'block';
         document.getElementById('pw').value = '';
         document.getElementById('pw').focus();
-        btn.textContent = 'Sign in';
-        btn.disabled = false;
       }
     });
   </script>

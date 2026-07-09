@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 try {
   const envText = readFileSync(".env", "utf8");
   for (const line of envText.split("\n")) {
-    const m = line.trim().replace(/^\uFEFF/, "").match(/^([A-Z_][A-Z0-9_]*)=(.+)$/);
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.+)$/);
     if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
   }
 } catch {}
@@ -218,7 +218,7 @@ try {
   const { data: siteSettings } = await sb.from("site_settings").select("*").maybeSingle();
   const { data: menuItems } = await sb
     .from("menu_items")
-    .select("*, menu_categories(name, slug, display_order)")
+    .select("*, menu_categories(name, slug)")
     .eq("is_available", true)
     .order("display_order");
   if (siteSettings) {
@@ -247,7 +247,6 @@ try {
       ...item,
       category: item.menu_categories?.slug || item.category || item.category_id || "",
       categoryName: item.menu_categories?.name || "",
-      categoryDisplayOrder: item.menu_categories?.display_order ?? 0,
       image: item.image_url,
       available: item.is_available !== false,
       price: item.price,
@@ -276,9 +275,7 @@ const replacements = {
   "{{WHATSAPP_WAME}}": toWaMe(cms.contact.whatsapp),
   "{{ADDRESS_LINE1}}": escH(cms.contact.addressLine1),
   "{{ADDRESS_CITY}}": escH(cms.contact.addressCity),
-  "{{FOOTER_HOURS_HTML}}": footerHoursHtml(cms.hours),
-  "{{SUPABASE_URL}}": escH(SUPABASE_URL),
-  "{{SUPABASE_ANON_KEY}}": escH(SUPABASE_ANON_KEY)
+  "{{FOOTER_HOURS_HTML}}": footerHoursHtml(cms.hours)
 };
 
 for (const [token, value] of Object.entries(replacements)) {
@@ -293,8 +290,6 @@ await cp("scripts/seed.mjs", "dist/scripts/seed.mjs");
 await cp("package-lock.json", "dist/package-lock.json");
 await writeFile("index.html", html, "utf8");
 await writeFile("dist/index.html", html, "utf8");
-await writeFile("data/menu.json", `${JSON.stringify(menu, null, 2)}\n`, "utf8");
-await writeFile("dist/data/menu.json", `${JSON.stringify(menu, null, 2)}\n`, "utf8");
 await writeFile("robots.txt", robotsTxt(), "utf8");
 await writeFile("dist/robots.txt", robotsTxt(), "utf8");
 await writeFile("sitemap.xml", sitemapXml(), "utf8");
@@ -310,7 +305,5 @@ async function injectAdminCreds(filePath) {
   await writeFile(filePath, content, "utf8");
 }
 await injectAdminCreds("admin/index.html");
-await injectAdminCreds("admin/login.html");
 await injectAdminCreds("dist/admin/index.html");
-await injectAdminCreds("dist/admin/login.html");
 console.log("Build: injected Supabase credentials into admin HTML");
