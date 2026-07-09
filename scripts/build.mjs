@@ -310,5 +310,7 @@ async function injectAdminCreds(filePath) {
   await writeFile(filePath, content, "utf8");
 }
 await injectAdminCreds("admin/index.html");
+await injectAdminCreds("admin/login.html");
 await injectAdminCreds("dist/admin/index.html");
+await injectAdminCreds("dist/admin/login.html");
 console.log("Build: injected Supabase credentials into admin HTML");

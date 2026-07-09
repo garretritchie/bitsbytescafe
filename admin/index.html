@@ -30,11 +30,35 @@
     const sb = createClient(window.BBC_SUPABASE_URL, window.BBC_SUPABASE_ANON_KEY);
 
     /* ── AUTH HELPERS ── */
-    const ADMIN_TOKEN = btoa('admin:password123');
     const STORE_KEY = 'bbcAdminToken';
+    const STORE_EMAIL_KEY = 'bbcAdminEmail';
     const MENU_IMAGE_FALLBACK = '/images/menu-photo-unavailable.svg';
+    function makeToken(email) { return btoa('bbc:' + email + ':authenticated'); }
     function getStoredToken() { return localStorage.getItem(STORE_KEY) || ''; }
-    function clearStoredToken() { localStorage.removeItem(STORE_KEY); }
+    function getStoredEmail() { return localStorage.getItem(STORE_EMAIL_KEY) || ''; }
+    function clearStoredToken() { localStorage.removeItem(STORE_KEY); localStorage.removeItem(STORE_EMAIL_KEY); }
+    function isAuthenticated() {
+      const email = getStoredEmail();
+      return email && getStoredToken() === makeToken(email);
+    }
+
+    /* ── PASSWORD UTILITIES (PBKDF2-SHA256 via Web Crypto) ── */
+    async function pbkdf2Hash(password, salt) {
+      const enc = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']
+      );
+      const bits = await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(salt), iterations: 100000 },
+        keyMaterial, 256
+      );
+      return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function generateSalt() {
+      return Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+    }
 
     /* ── SUPABASE DATA HELPERS ── */
     async function sbGet(table, opts = {}) {
@@ -266,11 +290,38 @@
       // ── users ──────────────────────────────────────────────────────────────
       if (url === '/api/users' && method === 'GET')
         return sbGet('admin_user_profiles', { order: 'created_at' });
-      if (url === '/api/users' && method === 'POST')
-        return sbInsert('admin_user_profiles', body);
+      if (url === '/api/users' && method === 'POST') {
+        const { password, ...profileData } = body;
+        const created = await sbInsert('admin_user_profiles', profileData);
+        if (password) {
+          const salt = generateSalt();
+          const hash = await pbkdf2Hash(password, salt);
+          await sbInsert('admin_user_credentials', {
+            user_id: created.id, password_hash: hash, password_salt: salt,
+            password_updated_at: new Date().toISOString()
+          });
+        }
+        return created;
+      }
       const userMatch = url.match(/^\/api\/users\/(.+)$/);
       if (userMatch) {
-        if (method === 'PUT') return sbUpdate('admin_user_profiles', userMatch[1], body);
+        if (method === 'PUT') {
+          const { password, ...profileData } = body;
+          const updated = await sbUpdate('admin_user_profiles', userMatch[1], profileData);
+          if (password) {
+            const salt = generateSalt();
+            const hash = await pbkdf2Hash(password, salt);
+            const { data: existing } = await sb.from('admin_user_credentials').select('id').eq('user_id', userMatch[1]).limit(1);
+            if (existing && existing.length > 0) {
+              await sb.from('admin_user_credentials').update({
+                password_hash: hash, password_salt: salt, password_updated_at: new Date().toISOString(), updated_at: new Date().toISOString()
+              }).eq('user_id', userMatch[1]);
+            } else {
+              await sbInsert('admin_user_credentials', { user_id: userMatch[1], password_hash: hash, password_salt: salt, password_updated_at: new Date().toISOString() });
+            }
+          }
+          return updated;
+        }
         if (method === 'DELETE') { await sbDelete('admin_user_profiles', userMatch[1]); return {}; }
       }
 
@@ -1657,7 +1708,7 @@
       const [loading, setLoading] = useState(true);
       const [modal, setModal] = useState(null);
       const [saving, setSaving] = useState(false);
-      const emptyForm = { first_name: '', last_name: '', email: '', role: 'staff', status: 'active', notes: '' };
+      const emptyForm = { first_name: '', last_name: '', email: '', role: 'staff', status: 'active', notes: '', password: '' };
       const [form, setForm] = useState(emptyForm);
 
       async function load() {
@@ -1670,17 +1721,27 @@
       useEffect(() => { load(); }, []);
 
       function openAdd() { setForm(emptyForm); setModal('add'); }
-      function openEdit(u) { setForm({ first_name: u.first_name || '', last_name: u.last_name || '', email: u.email || '', role: u.role || 'staff', status: u.status || 'active', notes: u.notes || '' }); setModal(u); }
+      function openEdit(u) { setForm({ first_name: u.first_name || '', last_name: u.last_name || '', email: u.email || '', role: u.role || 'staff', status: u.status || 'active', notes: u.notes || '', password: '' }); setModal(u); }
 
       async function handleSave() {
+        if (modal === 'add' && form.password.length < 8) {
+          showToast('Password must be at least 8 characters.', 'error');
+          return;
+        }
+        if (form.password && form.password.length < 8) {
+          showToast('Password must be at least 8 characters.', 'error');
+          return;
+        }
         setSaving(true);
         try {
+          const payload = { ...form };
+          if (!payload.password) delete payload.password;
           if (modal === 'add') {
-            const created = await apiFetch('/api/users', { method: 'POST', body: JSON.stringify(form) });
+            const created = await apiFetch('/api/users', { method: 'POST', body: JSON.stringify(payload) });
             setUsers(prev => [...prev, created]);
             showToast('User added');
           } else {
-            const updated = await apiFetch(`/api/users/${modal.id}`, { method: 'PUT', body: JSON.stringify(form) });
+            const updated = await apiFetch(`/api/users/${modal.id}`, { method: 'PUT', body: JSON.stringify(payload) });
             setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
             showToast('User updated');
           }
@@ -1770,11 +1831,25 @@
                       </select>
                     </div>
                   </div>
+                  <div className="form-group">
+                    <label>
+                      {modal === 'add' ? <span>Password <span className="required">*</span></span> : 'Set New Password'}
+                      {modal !== 'add' && <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400, marginLeft: 6 }}>(leave blank to keep current)</span>}
+                    </label>
+                    <input
+                      type="password"
+                      value={form.password}
+                      onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                      placeholder={modal === 'add' ? 'Min. 8 characters' : 'New password (optional)'}
+                      autoComplete="new-password"
+                      minLength={8}
+                    />
+                  </div>
                   <div className="form-group"><label>Notes</label><textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes…" /></div>
                 </div>
                 <div className="modal-footer">
                   <button className="btn btn-secondary" onClick={() => setModal(null)}>Cancel</button>
-                  <button className="btn btn-primary" onClick={handleSave} disabled={saving || !form.email.trim()}>
+                  <button className="btn btn-primary" onClick={handleSave} disabled={saving || !form.email.trim() || (modal === 'add' && !form.password.trim())}>
                     {saving ? 'Saving…' : (modal === 'add' ? 'Add User' : 'Save')}
                   </button>
                 </div>
@@ -1859,7 +1934,7 @@
       const [auth, setAuth] = useState(null);
 
       useEffect(() => {
-        if (getStoredToken() === ADMIN_TOKEN) { setAuth(true); }
+        if (isAuthenticated()) { setAuth(true); }
         else window.location.replace('/admin/login');
       }, []);
 

@@ -26,9 +26,9 @@
 
       <form id="loginForm" novalidate>
         <div class="form-group">
-          <label for="un">Username</label>
-          <input id="un" name="username" type="text"
-            placeholder="Username" required autofocus autocomplete="username">
+          <label for="un">Email</label>
+          <input id="un" name="username" type="email"
+            placeholder="your@email.com" required autofocus autocomplete="username">
         </div>
         <div class="form-group">
           <label for="pw">Password</label>
@@ -42,41 +42,111 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script>
-    // Auth token is derived the same way as server/ADMIN_TOKEN so they always match.
-    const ADMIN_TOKEN = btoa('admin:password123');
+    window.BBC_SUPABASE_URL = 'https://rqjkqigxwqyxyexrfykb.supabase.co';
+    window.BBC_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxamtxaWd4d3F5eHlleHJmeWtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1MTczNTIsImV4cCI6MjA5OTA5MzM1Mn0.J97To7TUkxqfVlS5ZfIx8P106Ng2tuIr64XgfjvNd4E';
+  </script>
+  <script>
     const STORE_KEY = 'bbcAdminToken';
+    const STORE_EMAIL_KEY = 'bbcAdminEmail';
 
-    // Already logged in — skip straight to the dashboard.
-    if (localStorage.getItem(STORE_KEY) === ADMIN_TOKEN) {
+    const { createClient } = supabase;
+    const sb = createClient(window.BBC_SUPABASE_URL, window.BBC_SUPABASE_ANON_KEY);
+
+    // Derive an auth token from email so it's user-specific
+    function makeToken(email) { return btoa('bbc:' + email + ':authenticated'); }
+
+    // Already logged in — skip straight to the dashboard
+    const storedEmail = localStorage.getItem(STORE_EMAIL_KEY);
+    if (storedEmail && localStorage.getItem(STORE_KEY) === makeToken(storedEmail)) {
       window.location.replace('/admin/');
     }
 
-    // Show error from a redirected form attempt (fallback path).
+    // Show error from redirect
     if (new URLSearchParams(window.location.search).get('error')) {
       const el = document.getElementById('error-msg');
-      el.textContent = 'Invalid username or password.';
+      el.textContent = 'Invalid email or password.';
       el.style.display = 'block';
     }
 
-    document.getElementById('loginForm').addEventListener('submit', function (e) {
+    // PBKDF2-SHA256 password utilities using Web Crypto API
+    async function pbkdf2Hash(password, salt) {
+      const enc = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']
+      );
+      const bits = await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(salt), iterations: 100000 },
+        keyMaterial, 256
+      );
+      return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function verifyPassword(password, salt, storedHash) {
+      const computed = await pbkdf2Hash(password, salt);
+      return computed === storedHash;
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async function (e) {
       e.preventDefault();
-      const username = document.getElementById('un').value.trim();
+      const email = document.getElementById('un').value.trim().toLowerCase();
       const password = document.getElementById('pw').value;
       const errorEl = document.getElementById('error-msg');
       const btn = document.getElementById('submitBtn');
 
-      if (username === 'admin' && password === 'password123') {
-        // Store the auth token — this is what the admin SPA and API calls rely on.
-        localStorage.setItem(STORE_KEY, ADMIN_TOKEN);
-        btn.textContent = 'Signing in…';
-        btn.disabled = true;
+      errorEl.style.display = 'none';
+      btn.textContent = 'Signing in…';
+      btn.disabled = true;
+
+      try {
+        // Look up user profile by email
+        const { data: profiles, error: profileErr } = await sb
+          .from('admin_user_profiles')
+          .select('id, email, status')
+          .eq('email', email)
+          .limit(1);
+
+        if (profileErr || !profiles || profiles.length === 0) {
+          throw new Error('Invalid email or password.');
+        }
+
+        const profile = profiles[0];
+
+        if (profile.status === 'disabled') {
+          throw new Error('This account has been disabled. Contact your administrator.');
+        }
+
+        // Fetch stored credential
+        const { data: creds, error: credErr } = await sb
+          .from('admin_user_credentials')
+          .select('password_hash, password_salt')
+          .eq('user_id', profile.id)
+          .limit(1);
+
+        if (credErr || !creds || creds.length === 0) {
+          throw new Error('Invalid email or password.');
+        }
+
+        const { password_hash, password_salt } = creds[0];
+        const valid = await verifyPassword(password, password_salt, password_hash);
+
+        if (!valid) {
+          throw new Error('Invalid email or password.');
+        }
+
+        // Authenticated — store token and email
+        localStorage.setItem(STORE_KEY, makeToken(profile.email));
+        localStorage.setItem(STORE_EMAIL_KEY, profile.email);
         window.location.replace('/admin/');
-      } else {
-        errorEl.textContent = 'Invalid username or password.';
+
+      } catch (err) {
+        errorEl.textContent = err.message || 'Sign in failed. Please try again.';
         errorEl.style.display = 'block';
         document.getElementById('pw').value = '';
         document.getElementById('pw').focus();
+        btn.textContent = 'Sign in';
+        btn.disabled = false;
       }
     });
   </script>
