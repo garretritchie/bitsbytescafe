@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://newsite.bitsbytescafe.com/sitemap.xml
+Sitemap: https://bitsbytescafe.com/sitemap.xml
