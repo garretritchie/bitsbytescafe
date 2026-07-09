@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { createPasswordCredential, verifyPasswordCredential } from './scripts/admin-password-auth.mjs';
+import { classifyVisitorSource, summarizeAnalytics } from './scripts/analytics-summary.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR   = path.join(__dirname, 'data');
@@ -720,13 +721,21 @@ app.delete('/api/users/:id', requireAuth, async (req, res) => {
 // ── Analytics ─────────────────────────────────────────────────────────────────
 app.post('/api/analytics/event', async (req, res) => {
   try {
-    const { event_type, page_path, referrer, visitor_id, metadata } = req.body;
+    const { event_type, page_path, referrer, visitor_id, metadata, source } = req.body;
     if (!event_type) return res.status(400).json({ error: 'event_type required' });
-    await supabase.from('analytics_events').insert({
-      event_type, page_path: page_path||'/', referrer: referrer||'',
+    const payload = { event_type, page_path: page_path||'/', referrer: referrer||'', visitor_id: visitor_id||'', metadata: metadata||{} };
+    const visitorSource = source || classifyVisitorSource(payload);
+    const eventRow = {
+      event_type, page_path: payload.page_path, referrer: payload.referrer, source: visitorSource,
       user_agent: req.headers['user-agent']?.slice(0,500)||'',
-      visitor_id: visitor_id||'', metadata: metadata||{}
-    });
+      visitor_id: payload.visitor_id, metadata: { source: visitorSource, ...payload.metadata }
+    };
+    let { error } = await supabase.from('analytics_events').insert(eventRow);
+    if (error && /source/i.test(error.message || '')) {
+      const { source: _source, ...legacyRow } = eventRow;
+      ({ error } = await supabase.from('analytics_events').insert(legacyRow));
+    }
+    if (error) throw error;
     res.json({ ok:true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -741,33 +750,10 @@ app.get('/api/analytics', requireAuth, async (req, res) => {
     else if (range === '30d') { since = new Date(now - 30*24*60*60*1000).toISOString(); }
     // else 'all' → no filter
 
-    let query = supabase.from('analytics_events').select('event_type,page_path,visitor_id,created_at,metadata');
+    let query = supabase.from('analytics_events').select('*');
     if (since) query = query.gte('created_at', since);
     const { data: events } = await query.order('created_at', { ascending:false });
-    const all = events || [];
-
-    const pageViews = all.filter(e => e.event_type === 'page_view');
-    const shareClicks = all.filter(e => e.event_type === 'social_share_click');
-    const uniqueVisitors = new Set(pageViews.map(e => e.visitor_id).filter(Boolean)).size;
-
-    const pageCounts = {};
-    pageViews.forEach(e => { pageCounts[e.page_path || '/'] = (pageCounts[e.page_path||'/']||0)+1; });
-    const topPages = Object.entries(pageCounts).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([path,count])=>({path,count}));
-
-    const fbShares = shareClicks.filter(e=>e.metadata?.platform==='facebook').length;
-    const waShares = shareClicks.filter(e=>e.metadata?.platform==='whatsapp').length;
-
-    // Traffic by day (last 14 days max)
-    const dayCounts = {};
-    pageViews.forEach(e => {
-      const day = e.created_at?.slice(0,10);
-      if (day) dayCounts[day] = (dayCounts[day]||0)+1;
-    });
-    const trafficByDay = Object.entries(dayCounts).sort().slice(-14).map(([date,count])=>({date,count}));
-
-    res.json({ totalPageViews: pageViews.length, uniqueVisitors, totalShares: shareClicks.length,
-      fbShares, waShares, topPages, trafficByDay,
-      recentEvents: all.slice(0,20) });
+    res.json(summarizeAnalytics(events || []));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

@@ -275,7 +275,9 @@ const replacements = {
   "{{WHATSAPP_WAME}}": toWaMe(cms.contact.whatsapp),
   "{{ADDRESS_LINE1}}": escH(cms.contact.addressLine1),
   "{{ADDRESS_CITY}}": escH(cms.contact.addressCity),
-  "{{FOOTER_HOURS_HTML}}": footerHoursHtml(cms.hours)
+  "{{FOOTER_HOURS_HTML}}": footerHoursHtml(cms.hours),
+  "{{SUPABASE_URL}}": escH(SUPABASE_URL),
+  "{{SUPABASE_ANON_KEY}}": escH(SUPABASE_ANON_KEY)
 };
 
 for (const [token, value] of Object.entries(replacements)) {

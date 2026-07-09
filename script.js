@@ -38,18 +38,63 @@ function getVisitorId() {
   return id;
 }
 
+function visitorSource() {
+  const params = new URLSearchParams(window.location.search);
+  const campaignSource = params.get('utm_source') || params.get('source');
+  if (campaignSource) return campaignSource.toLowerCase();
+  const ref = document.referrer || '';
+  if (!ref) return 'direct';
+  try {
+    const host = new URL(ref).hostname.toLowerCase();
+    if (host.includes('google.')) return 'google';
+    if (host.includes('facebook.') || host.includes('fb.')) return 'facebook';
+    if (host.includes('instagram.')) return 'instagram';
+    if (host.includes('tiktok.')) return 'tiktok';
+    if (host.includes('bing.') || host.includes('yahoo.') || host.includes('duckduckgo.')) return 'search';
+    return 'referral';
+  } catch {
+    return 'referral';
+  }
+}
+
 function trackEvent(eventType, metadata = {}) {
+  const source = visitorSource();
+  const event = {
+    event_type: eventType,
+    page_path: window.location.pathname,
+    referrer: document.referrer || '',
+    visitor_id: getVisitorId(),
+    source,
+    metadata: { source, ...metadata }
+  };
+
   fetch('/api/analytics/event', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      event_type: eventType,
-      page_path: window.location.pathname,
-      referrer: document.referrer || '',
-      visitor_id: getVisitorId(),
-      metadata
-    })
-  }).catch(() => {});
+    body: JSON.stringify(event)
+  })
+    .then(res => { if (!res.ok) return insertAnalyticsEvent(event); })
+    .catch(() => insertAnalyticsEvent(event));
+}
+
+async function insertAnalyticsEvent(event) {
+  const url = window.BBC_SUPABASE_URL;
+  const key = window.BBC_SUPABASE_ANON_KEY;
+  if (!url || !key || url.includes('{{')) return;
+  const endpoint = `${url.replace(/\/+$/, '')}/rest/v1/analytics_events`;
+  const headers = {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=minimal'
+  };
+  let body = JSON.stringify(event);
+  let res = await fetch(endpoint, { method: 'POST', headers, body });
+  if (!res.ok && String(await res.text()).includes('source')) {
+    const { source: _source, ...legacyEvent } = event;
+    body = JSON.stringify(legacyEvent);
+    res = await fetch(endpoint, { method: 'POST', headers, body });
+  }
 }
 
 trackEvent('page_view');
@@ -98,6 +143,7 @@ function shortDescription(description) {
 }
 
 function openMenuModal(item) {
+  trackEvent('menu_modal_open', { item: item.name, category: item.category });
   const imgSrc = assetUrl(item.image || MENU_IMAGE_FALLBACK);
   const imgAlt = item.image ? (item.imageAlt || item.name) : 'Photo Unavailable';
   menuModalImage.src = imgSrc;
@@ -310,6 +356,7 @@ async function renderMenu() {
         btn.classList.toggle('is-active', btn.getAttribute('data-menu-filter') === category);
       });
       renderItemCards(grid, visible.filter(item => item.category === category));
+      trackEvent('menu_filter_click', { category });
       bindItemCards();
     }
 
@@ -317,9 +364,11 @@ async function renderMenu() {
     setupMenuFilter((filter) => {
       if (filter === 'all') {
         renderCategoryCards(grid, visible, selectCategory);
+        trackEvent('menu_filter_click', { category: 'all' });
         return;
       }
       renderItemCards(grid, visible.filter(item => item.category === filter));
+      trackEvent('menu_filter_click', { category: filter });
       bindItemCards();
     });
   } catch {
