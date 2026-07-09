@@ -158,7 +158,7 @@ function assetUrl(src) {
 function sortMenuItemsForDisplay(items) {
   const categoryOrder = new Map();
   items.forEach((item) => {
-    if (!categoryOrder.has(item.category)) categoryOrder.set(item.category, categoryOrder.size);
+    if (!categoryOrder.has(item.category)) categoryOrder.set(item.category, categorySortValue(item, categoryOrder.size));
   });
 
   return items
@@ -176,6 +176,38 @@ function sortMenuItemsForDisplay(items) {
 }
 
 /* ── MENU FILTER ── */
+function categorySortValue(item, fallback) {
+  const order = Number(item.categoryDisplayOrder ?? item.category_display_order);
+  return Number.isFinite(order) ? order : fallback;
+}
+
+function orderedCategories(items) {
+  const categories = new Map();
+  items.forEach((item, index) => {
+    if (!item.category || categories.has(item.category)) return;
+    categories.set(item.category, {
+      category: item.category,
+      order: categorySortValue(item, index)
+    });
+  });
+  return [...categories.values()]
+    .sort((a, b) => a.order - b.order || a.category.localeCompare(b.category))
+    .map(({ category }) => category);
+}
+
+function orderMenuFilterButtons(items) {
+  const filter = document.querySelector('.menu-filter');
+  if (!filter) return;
+  const buttons = new Map([...filter.querySelectorAll('[data-menu-filter]')].map(btn => [btn.getAttribute('data-menu-filter'), btn]));
+  const allButton = buttons.get('all');
+  filter.innerHTML = '';
+  if (allButton) filter.appendChild(allButton);
+  orderedCategories(items).forEach(category => {
+    const button = buttons.get(category);
+    if (button) filter.appendChild(button);
+  });
+}
+
 function setupMenuFilter(onChange) {
   const filterButtons = document.querySelectorAll('[data-menu-filter]');
 
@@ -200,9 +232,7 @@ function minCategoryPrice(items) {
 }
 
 function categorySummaries(items) {
-  const categoryOrder = ['breakfast', 'lunch', 'chicken-wings', 'sandwiches-wraps-burgers', 'sides-salads'];
-
-  return categoryOrder
+  return orderedCategories(items)
     .map(category => {
       const categoryItems = items.filter(item => item.category === category);
       if (categoryItems.length === 0) return null;
@@ -289,6 +319,7 @@ async function renderMenu() {
     }
 
     const itemMap = new Map(visible.map(item => [String(item.id), item]));
+    orderMenuFilterButtons(visible);
 
     function bindItemCards() {
       grid.querySelectorAll('[data-menu-detail]').forEach((btn) => {
