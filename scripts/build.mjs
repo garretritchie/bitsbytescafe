@@ -216,7 +216,11 @@ function sitemapXml() {
 let cms, menu;
 try {
   const { data: siteSettings } = await sb.from("site_settings").select("*").maybeSingle();
-  const { data: menuItems } = await sb.from("menu_items").select("*").eq("available", true).order("display_order");
+  const { data: menuItems } = await sb
+    .from("menu_items")
+    .select("*, menu_categories(name, slug)")
+    .eq("is_available", true)
+    .order("display_order");
   if (siteSettings) {
     cms = {
       hero: {
@@ -241,9 +245,10 @@ try {
   if (menuItems?.length) {
     menu = menuItems.map(item => ({
       ...item,
-      category: item.category || item.category_id || "",
+      category: item.menu_categories?.slug || item.category || item.category_id || "",
+      categoryName: item.menu_categories?.name || "",
       image: item.image_url,
-      available: item.available,
+      available: item.is_available !== false,
       price: item.price,
     }));
     console.log(`Build: loaded ${menu.length} menu items from Supabase`);

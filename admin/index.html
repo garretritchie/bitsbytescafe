@@ -46,6 +46,10 @@
       if (error) throw new Error(error.message);
       return data;
     }
+    async function sbGetSafe(table, opts = {}) {
+      try { return await sbGet(table, opts); }
+      catch (err) { console.warn(`Skipping ${table}:`, err.message); return []; }
+    }
     async function sbInsert(table, row) {
       const { data, error } = await sb.from(table).insert(row).select().single();
       if (error) throw new Error(error.message);
@@ -64,6 +68,23 @@
       const { data, error } = await sb.from(table).upsert(row, { onConflict: match }).select().single();
       if (error) throw new Error(error.message);
       return data;
+    }
+    function normalizeMenuItem(row) {
+      return {
+        id: row.id, name: row.name, description: row.description || '',
+        categoryId: row.category_id || '', category: row.menu_categories?.slug || '',
+        categoryName: row.menu_categories?.name || '',
+        price: row.price || '', priceTiers: row.price_tiers || [],
+        image: row.image_url || '', imageAlt: row.image_alt || row.name,
+        available: row.is_available !== false, seasonal: row.is_seasonal === true,
+        featured: row.is_featured === true, displayOrder: row.display_order || 0,
+      };
+    }
+    function normalizeGalleryItem(row) {
+      return {
+        id: row.id, filename: row.file_name || '', src: row.file_url || '',
+        caption: row.caption || row.alt_text || '',
+      };
     }
     async function sbUploadImage(bucket, file, path) {
       const { error } = await sb.storage.from(bucket).upload(path, file, { upsert: true, contentType: file.type });
@@ -125,17 +146,17 @@
       // ── dashboard ──────────────────────────────────────────────────────────
       if (url === '/api/dashboard') {
         const [menuItems, specials, gallery, activity, pageViews] = await Promise.all([
-          sbGet('menu_items'),
-          sbGet('daily_specials'),
-          sbGet('media_files', { eq: { usage_type: 'gallery' } }),
-          sbGet('activity_log', { order: 'created_at', asc: false, limit: 10 }),
-          sbGet('page_analytics', { limit: 1000 }),
+          sbGetSafe('menu_items'),
+          sbGetSafe('specials'),
+          sbGetSafe('media_assets', { eq: { usage_type: 'gallery' } }),
+          sbGetSafe('admin_activity_log', { order: 'created_at', asc: false, limit: 10 }),
+          sbGetSafe('analytics_events', { eq: { event_type: 'page_view' }, limit: 1000 }),
         ]);
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        const recentViews = pageViews.filter(p => p.visited_at >= sevenDaysAgo);
+        const recentViews = pageViews.filter(p => p.created_at >= sevenDaysAgo);
         return {
           totalItems: menuItems.length,
-          availableItems: menuItems.filter(i => i.available).length,
+          availableItems: menuItems.filter(i => i.is_available !== false).length,
           activeSpecials: specials.filter(s => s.is_active).length,
           galleryCount: gallery.length,
           recentPageViews: recentViews.length,
@@ -145,37 +166,33 @@
 
       // ── categories ─────────────────────────────────────────────────────────
       if (url === '/api/categories' && method === 'GET')
-        return sbGet('categories', { order: 'display_order' });
+        return sbGet('menu_categories', { order: 'display_order' });
       if (url === '/api/categories' && method === 'POST')
-        return sbInsert('categories', { ...body, is_active: true });
+        return sbInsert('menu_categories', { ...body, is_active: true });
       const catMatch = url.match(/^\/api\/categories\/(.+)$/);
       if (catMatch) {
-        if (method === 'PUT') return sbUpdate('categories', catMatch[1], body);
-        if (method === 'DELETE') { await sbDelete('categories', catMatch[1]); return {}; }
+        if (method === 'PUT') return sbUpdate('menu_categories', catMatch[1], body);
+        if (method === 'DELETE') return sbUpdate('menu_categories', catMatch[1], { is_active: false, updated_at: new Date().toISOString() });
       }
 
       // ── specials ───────────────────────────────────────────────────────────
       if (url === '/api/specials' && method === 'GET')
-        return sbGet('daily_specials', { order: 'display_order' });
+        return sbGet('specials', { order: 'display_order' });
       if (url === '/api/specials' && method === 'POST')
-        return sbInsert('daily_specials', body);
+        return sbInsert('specials', body);
       const spMatch = url.match(/^\/api\/specials\/(.+)$/);
       if (spMatch) {
-        if (method === 'PUT') return sbUpdate('daily_specials', spMatch[1], body);
-        if (method === 'DELETE') { await sbDelete('daily_specials', spMatch[1]); return {}; }
+        if (method === 'PUT') return sbUpdate('specials', spMatch[1], body);
+        if (method === 'DELETE') return sbUpdate('specials', spMatch[1], { is_active: false, updated_at: new Date().toISOString() });
       }
 
       // ── menu ───────────────────────────────────────────────────────────────
       if (url === '/api/menu' && method === 'GET') {
-        const rows = await sbGet('menu_items', { order: 'display_order' });
-        return rows.map(r => ({
-          id: r.id, name: r.name, description: r.description,
-          categoryId: r.category_id || r.category, category: r.category,
-          price: r.price, priceTiers: r.price_tiers || [],
-          image: r.image_url, imageAlt: r.image_alt,
-          available: r.available, seasonal: r.seasonal, featured: r.featured,
-          displayOrder: r.display_order,
-        }));
+        const { data, error } = await sb.from('menu_items')
+          .select('*, menu_categories(name, slug)')
+          .order('display_order');
+        if (error) throw new Error(error.message);
+        return (data || []).map(normalizeMenuItem);
       }
       const menuMatch = url.match(/^\/api\/menu\/(.+)$/);
       if (menuMatch) {
@@ -184,11 +201,11 @@
 
       // ── gallery ────────────────────────────────────────────────────────────
       if (url === '/api/gallery' && method === 'GET')
-        return sbGet('media_files', { eq: { usage_type: 'gallery' }, order: 'display_order' });
+        return (await sbGet('media_assets', { eq: { usage_type: 'gallery' }, order: 'display_order' })).map(normalizeGalleryItem);
       const galMatch = url.match(/^\/api\/gallery\/(.+)$/);
       if (galMatch) {
-        if (method === 'DELETE') { await sbDelete('media_files', galMatch[1]); return {}; }
-        if (method === 'PATCH') return sbUpdate('media_files', galMatch[1], body);
+        if (method === 'DELETE') { await sbDelete('media_assets', galMatch[1]); return {}; }
+        if (method === 'PATCH') return normalizeGalleryItem(await sbUpdate('media_assets', galMatch[1], { caption: body.caption || '', alt_text: body.caption || '', updated_at: new Date().toISOString() }));
       }
 
       // ── settings ───────────────────────────────────────────────────────────
@@ -222,25 +239,27 @@
         if (range === 'today') since = new Date().toISOString().slice(0, 10);
         else if (range === '7d') since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
         else if (range === '30d') since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        let pvQ = sb.from('page_analytics').select('*');
-        if (since) pvQ = pvQ.gte('visited_at', since);
-        const { data: pvData } = await pvQ;
+        let pvQ = sb.from('analytics_events').select('*').eq('event_type', 'page_view');
+        if (since) pvQ = pvQ.gte('created_at', since);
+        const { data: pvData, error: pvError } = await pvQ;
+        if (pvError) console.warn('Skipping analytics_events:', pvError.message);
         const views = pvData || [];
-        const { data: shares } = await sb.from('social_shares').select('*');
+        const { data: shares, error: shareError } = await sb.from('analytics_events').select('*').eq('event_type', 'social_share_click');
+        if (shareError) console.warn('Skipping social share analytics:', shareError.message);
         const allShares = shares || [];
         const byDay = {};
         views.forEach(v => {
-          const d = v.visited_at?.slice(0, 10);
+          const d = v.created_at?.slice(0, 10);
           if (d) byDay[d] = (byDay[d] || 0) + 1;
         });
         const byPage = {};
-        views.forEach(v => { if (v.path) byPage[v.path] = (byPage[v.path] || 0) + 1; });
+        views.forEach(v => { const path = v.page_path || '/'; byPage[path] = (byPage[path] || 0) + 1; });
         return {
           totalPageViews: views.length,
           uniqueVisitors: new Set(views.map(v => v.visitor_id).filter(Boolean)).size,
           totalShares: allShares.length,
-          fbShares: allShares.filter(s => s.platform === 'facebook').length,
-          waShares: allShares.filter(s => s.platform === 'whatsapp').length,
+          fbShares: allShares.filter(s => s.metadata?.platform === 'facebook').length,
+          waShares: allShares.filter(s => s.metadata?.platform === 'whatsapp').length,
           trafficByDay: Object.entries(byDay).sort(([a],[b]) => a.localeCompare(b)).map(([date, count]) => ({ date, count })),
           topPages: Object.entries(byPage).sort(([,a],[,b]) => b-a).slice(0,10).map(([path, count]) => ({ path, count })),
         };
@@ -274,15 +293,14 @@
         }
         const row = {
           name: fd.get('name'), description: fd.get('description'),
-          category: fd.get('categoryId'), category_id: fd.get('categoryId'),
+          category_id: fd.get('categoryId') || null,
           price: fd.get('price'), price_tiers: JSON.parse(fd.get('priceTiers') || '[]'),
           image_url, image_alt: fd.get('imageAlt'),
-          available: fd.get('available') === 'true', seasonal: fd.get('seasonal') === 'true',
-          featured: fd.get('featured') === 'true', display_order: parseInt(fd.get('displayOrder') || '0'),
-          usage_type: 'menu',
+          is_available: fd.get('available') === 'true', is_seasonal: fd.get('seasonal') === 'true',
+          is_featured: fd.get('featured') === 'true', display_order: parseInt(fd.get('displayOrder') || '0'),
         };
         const created = await sbInsert('menu_items', row);
-        return { ...created, categoryId: created.category_id, image: created.image_url, priceTiers: created.price_tiers || [] };
+        return normalizeMenuItem(created);
       }
       const menuMatch = url.match(/^\/api\/menu\/(.+)$/);
       if (menuMatch && (method === 'PUT' || method === 'PATCH')) {
@@ -294,15 +312,16 @@
         }
         const changes = {
           name: fd.get('name'), description: fd.get('description'),
-          category: fd.get('categoryId'), category_id: fd.get('categoryId'),
+          category_id: fd.get('categoryId') || null,
           price: fd.get('price'), price_tiers: JSON.parse(fd.get('priceTiers') || '[]'),
           image_url: image_url || undefined, image_alt: fd.get('imageAlt'),
-          available: fd.get('available') === 'true', seasonal: fd.get('seasonal') === 'true',
-          featured: fd.get('featured') === 'true', display_order: parseInt(fd.get('displayOrder') || '0'),
+          is_available: fd.get('available') === 'true', is_seasonal: fd.get('seasonal') === 'true',
+          is_featured: fd.get('featured') === 'true', display_order: parseInt(fd.get('displayOrder') || '0'),
+          updated_at: new Date().toISOString(),
         };
         if (!image_url) delete changes.image_url;
         const updated = await sbUpdate('menu_items', menuMatch[1], changes);
-        return { ...updated, categoryId: updated.category_id, image: updated.image_url, priceTiers: updated.price_tiers || [] };
+        return normalizeMenuItem(updated);
       }
 
       // ── gallery upload ─────────────────────────────────────────────────────
@@ -311,11 +330,11 @@
         if (!photoFile || photoFile.size === 0) throw new Error('No photo selected');
         const ext = photoFile.name.split('.').pop() || 'jpg';
         const image_url = await sbUploadImage('images', photoFile, `gallery/${Date.now()}.${ext}`);
-        return sbInsert('media_files', {
+        return normalizeGalleryItem(await sbInsert('media_assets', {
           file_name: photoFile.name, file_url: image_url, file_type: 'image',
           caption: fd.get('caption') || '', alt_text: fd.get('caption') || '',
           usage_type: 'gallery', display_order: 0,
-        });
+        }));
       }
 
       // ── hero image upload ──────────────────────────────────────────────────
@@ -1802,8 +1821,20 @@
       const { toasts, show: showToast } = useToast();
 
       useEffect(() => {
-        window.location.hash = page;
+        if (window.location.hash.replace('#', '') !== page) {
+          window.location.hash = page;
+        }
       }, [page]);
+
+      useEffect(() => {
+        function handleHashChange() {
+          const next = window.location.hash.replace('#', '');
+          if (validPages.includes(next)) setPage(next);
+        }
+
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+      }, []);
 
       function handleLogout() { clearStoredToken(); window.location.replace('/admin/login'); }
 
