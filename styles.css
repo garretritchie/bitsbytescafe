@@ -1900,20 +1900,21 @@ main {
   margin-top: 14px;
 }
 
-.footer-share-label {
+.site-footer .footer-share-label {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: rgba(255, 255, 255, 0.45);
+  color: #34383f;
   margin-bottom: 8px;
 }
 
-.footer-share-btn {
+.site-footer .footer-share-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 7px 13px;
+  border: 1px solid transparent;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
@@ -1921,9 +1922,17 @@ main {
   color: #fff;
   margin-right: 8px;
   margin-bottom: 6px;
-  transition: opacity 150ms, transform 150ms;
+  box-shadow: 0 8px 16px rgba(17, 19, 24, 0.08);
+  transition: filter 150ms, transform 150ms, box-shadow 150ms;
 }
 
-.footer-share-btn:hover { opacity: 0.85; transform: translateY(-1px); }
-.footer-share-fb { background: #1877f2; }
-.footer-share-wa { background: #25d366; }
+.site-footer .footer-share-btn:hover,
+.site-footer .footer-share-btn:focus-visible {
+  color: #fff;
+  filter: brightness(0.96);
+  box-shadow: 0 10px 20px rgba(17, 19, 24, 0.14);
+  transform: translateY(-1px);
+}
+
+.site-footer .footer-share-fb { background: #1877f2; }
+.site-footer .footer-share-wa { background: #128c4a; }
